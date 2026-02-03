@@ -89,10 +89,10 @@ const BeatMachine: React.FC = () => {
 
       {/* Content - 2-Column Layout: Input + Knobs */}
       <div className="flex-1 flex gap-8 overflow-hidden">
-        {/* Main Content Area */}
-        <div className={viewMode === 'timeline' || viewMode === 'arrangement' ? 'flex-1' : 'flex-shrink-0'}>
+        {/* Main Content Area - Scrollable */}
+        <div className={`overflow-y-auto ${viewMode === 'timeline' || viewMode === 'arrangement' ? 'flex-1' : 'flex-shrink-0'}`}>
           {viewMode === 'instrument' && instrumentMode === 'pads' && (
-            <div className="space-y-6">
+            <div className="space-y-6 pb-6">
               <PadGrid />
               <StepSequencer />
             </div>
