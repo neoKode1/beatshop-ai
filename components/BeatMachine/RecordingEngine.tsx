@@ -39,6 +39,19 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
   const metronomeRef = useRef<Tone.Synth | null>(null);
   const activeNotesRef = useRef<Map<string, { startTime: number; pitch: number }>>(new Map());
 
+  // Use refs to track recording state for callbacks
+  const isRecordingRef = useRef(false);
+  const isCountingInRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
+    isCountingInRef.current = isCountingIn;
+  }, [isCountingIn]);
+
   // Initialize metronome
   useEffect(() => {
     if (!metronomeRef.current) {
@@ -79,7 +92,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     for (let i = 1; i <= 4; i++) {
       setTimeout(() => {
         setCountIn(i);
-        
+
         // Play metronome click
         if (metronomeRef.current && (metronomeEnabled || isRecording)) {
           const pitch = i === 1 ? 'C6' : 'C5'; // Higher pitch on beat 1
@@ -88,13 +101,14 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
           metronomeRef.current.triggerAttackRelease(pitch, '32n');
         }
 
-        // Start recording after count-in
+        // Start recording RIGHT AFTER beat 4 click (not after another beat)
         if (i === 4) {
+          // Small delay to let the click sound, then start recording immediately
           setTimeout(() => {
             setIsCountingIn(false);
             setCountIn(0);
             startRecording();
-          }, beatDuration);
+          }, 50); // Just 50ms delay for the click to sound
         }
       }, (i - 1) * beatDuration);
     }
@@ -139,11 +153,16 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
 
   // Handle keyboard/MIDI input during recording
   const handleNoteOn = (pitch: number, velocity: number = 0.8) => {
-    if (!isRecording || isCountingIn) return;
+    // Use refs for accurate state checking
+    if (!isRecordingRef.current || isCountingInRef.current) {
+      console.log('❌ Note blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
+      return;
+    }
 
+    console.log('✅ Recording note ON:', pitch);
     const currentTime = Tone.now();
     const relativeTime = currentTime - recordingStartTimeRef.current;
-    
+
     // Store note start time
     const noteKey = `note_${pitch}`;
     activeNotesRef.current.set(noteKey, {
@@ -153,8 +172,13 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
   };
 
   const handleNoteOff = (pitch: number) => {
-    if (!isRecording || isCountingIn) return;
+    // Use refs for accurate state checking
+    if (!isRecordingRef.current || isCountingInRef.current) {
+      console.log('❌ Note OFF blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
+      return;
+    }
 
+    console.log('✅ Recording note OFF:', pitch);
     const noteKey = `note_${pitch}`;
     const noteStart = activeNotesRef.current.get(noteKey);
 
@@ -172,11 +196,14 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
         velocity: 0.8,
       };
 
+      console.log('📝 Note recorded:', note);
       recordedNotesRef.current.push(note);
       activeNotesRef.current.delete(noteKey);
 
       // Add note to display in real-time
       addMidiNote(note);
+    } else {
+      console.log('⚠️ No note start found for:', pitch);
     }
   };
 
@@ -192,7 +219,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     return () => {
       delete (window as any).recordingEngine;
     };
-  }, [isRecording, isCountingIn]);
+  }, []); // Empty deps - functions use refs so they don't need to be recreated
 
   // Render count-in indicator
   if (isCountingIn) {
