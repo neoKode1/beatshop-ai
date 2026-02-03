@@ -9,6 +9,7 @@ import MasterControls from './MasterControls';
 import ArrangementView from './ArrangementView';
 import TimelineView from './TimelineView';
 import RecordingEngine from './RecordingEngine';
+import StepSequencer from './StepSequencer';
 import { Grid3x3, Piano, List, Music } from 'lucide-react';
 
 const BeatMachine: React.FC = () => {
@@ -90,7 +91,12 @@ const BeatMachine: React.FC = () => {
       <div className="flex-1 flex gap-8 overflow-hidden">
         {/* Main Content Area */}
         <div className={viewMode === 'timeline' || viewMode === 'arrangement' ? 'flex-1' : 'flex-shrink-0'}>
-          {viewMode === 'instrument' && instrumentMode === 'pads' && <PadGrid />}
+          {viewMode === 'instrument' && instrumentMode === 'pads' && (
+            <div className="space-y-6">
+              <PadGrid />
+              <StepSequencer />
+            </div>
+          )}
           {viewMode === 'instrument' && instrumentMode === 'piano' && <PianoKeyboard />}
           {viewMode === 'timeline' && <TimelineView />}
           {viewMode === 'arrangement' && <ArrangementView />}
