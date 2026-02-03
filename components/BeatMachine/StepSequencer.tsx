@@ -52,28 +52,20 @@ const StepSequencer: React.FC = () => {
       {/* Top Toolbar */}
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-700/50">
         <div className="flex items-center gap-4">
-          <button className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
-            <Play size={20} className="text-white" />
-          </button>
-          <div className="h-8 w-px bg-gray-700"></div>
-          <button className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
-            <Music size={20} className="text-white" />
-          </button>
+          <div className="text-sm text-gray-400">
+            Use main transport controls (top toolbar) to play/pause
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
-          <select className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium text-gray-200">
-            <option>BB08</option>
-          </select>
-          <div className="h-8 w-px bg-gray-700"></div>
-          <select className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium text-gray-200">
-            <option>Pattern 01 ({bpm} BPM)</option>
-          </select>
+          <div className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium text-gray-200">
+            Pattern 01 • {bpm} BPM
+          </div>
           <button
             onClick={clearPattern}
             className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 rounded-lg text-sm font-medium text-red-400 transition-colors"
           >
-            Clear
+            Clear Pattern
           </button>
         </div>
       </div>

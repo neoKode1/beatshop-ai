@@ -61,13 +61,8 @@ const Toolbar: React.FC = () => {
         // Trigger active steps
         pads.forEach((pad, padIndex) => {
           const stepData = steps.find(s => s.padIndex === padIndex && s.stepIndex === step);
-          // Check if step is active AND pad has a sample (either synth or audio)
-          if (stepData?.active && pad.sample && !pad.muted) {
-            // Check if any pad is soloed
-            const hasSolo = pads.some(p => p.solo);
-            if (hasSolo && !pad.solo) return;
-
-            // Trigger the pad using the store's triggerPad function
+          // Check if step is active - triggerPad handles mute/solo logic
+          if (stepData?.active) {
             triggerPad(padIndex, stepData.velocity || 0.8);
           }
         });

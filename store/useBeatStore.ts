@@ -438,34 +438,46 @@ export const useBeatStore = create<BeatStore>((set, get) => ({
   },
   
   triggerPad: (padIndex, velocity = 0.8) => {
-    const pad = get().pads[padIndex];
-    if (!pad.muted && pad.sample) {
-      const time = Tone.now();
-      const vel = velocity;
+    const pads = get().pads;
+    const pad = pads[padIndex];
 
-      // Trigger synthesizer
-      if (pad.synth) {
-        if (pad.synth instanceof Tone.NoiseSynth ||
-            pad.synth instanceof Tone.MetalSynth) {
-          pad.synth.triggerAttackRelease('16n', time, vel);
-        } else if (pad.synth instanceof Tone.MembraneSynth ||
-                   pad.synth instanceof Tone.MonoSynth) {
-          pad.synth.triggerAttackRelease(pad.note || 'C2', '16n', time, vel);
-        }
-      }
+    // Check mute state
+    if (pad.muted || !pad.sample) return;
 
-      // Trigger audio player
-      if (pad.player && pad.player.loaded) {
-        pad.player.start(time);
+    // Check solo state - if any pad is soloed, only play soloed pads
+    const hasSolo = pads.some(p => p.solo);
+    if (hasSolo && !pad.solo) return;
+
+    const time = Tone.now();
+    const vel = velocity;
+
+    // Trigger synthesizer
+    if (pad.synth) {
+      if (pad.synth instanceof Tone.NoiseSynth ||
+          pad.synth instanceof Tone.MetalSynth) {
+        pad.synth.triggerAttackRelease('16n', time, vel);
+      } else if (pad.synth instanceof Tone.MembraneSynth ||
+                 pad.synth instanceof Tone.MonoSynth) {
+        pad.synth.triggerAttackRelease(pad.note || 'C2', '16n', time, vel);
       }
+    }
+
+    // Trigger audio player
+    if (pad.player && pad.player.loaded) {
+      pad.player.start(time);
     }
   },
   
   setPadVolume: (padIndex, volume) => {
     const pads = [...get().pads];
     pads[padIndex].volume = volume;
+    // Update synth volume
     if (pads[padIndex].synth) {
       pads[padIndex].synth!.volume.value = Tone.gainToDb(volume);
+    }
+    // Update player volume
+    if (pads[padIndex].player) {
+      pads[padIndex].player!.volume.value = Tone.gainToDb(volume);
     }
     set({ pads });
   },
