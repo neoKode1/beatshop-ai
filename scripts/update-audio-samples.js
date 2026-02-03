@@ -37,9 +37,10 @@ fs.readdirSync(samplesDir).forEach(folder => {
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, l => l.toUpperCase());
 
-    // URL encode the file path to handle special characters like # in C#
-    const encodedFile = encodeURIComponent(file);
-    const encodedFolder = encodeURIComponent(folder);
+    // For Next.js public folder, we need to encode spaces but keep + as literal
+    // encodeURIComponent would turn + into %2B which doesn't work with Next.js
+    const encodedFile = file.replace(/ /g, '%20');
+    const encodedFolder = folder.replace(/ /g, '%20');
 
     samples.push({
       id: `sample_${idx++}`,
