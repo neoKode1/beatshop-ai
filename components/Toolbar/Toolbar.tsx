@@ -61,27 +61,14 @@ const Toolbar: React.FC = () => {
         // Trigger active steps
         pads.forEach((pad, padIndex) => {
           const stepData = steps.find(s => s.padIndex === padIndex && s.stepIndex === step);
-          if (stepData?.active && pad.synth && !pad.muted) {
+          // Check if step is active AND pad has a sample (either synth or audio)
+          if (stepData?.active && pad.sample && !pad.muted) {
             // Check if any pad is soloed
             const hasSolo = pads.some(p => p.solo);
             if (hasSolo && !pad.solo) return;
 
-            // Trigger the synth with velocity
-            const velocity = stepData.velocity || 0.8;
-
-            // Trigger synthesizer
-            if (pad.synth) {
-              if (pad.synth instanceof Tone.NoiseSynth || pad.synth instanceof Tone.MetalSynth) {
-                pad.synth.triggerAttackRelease('16n', time, velocity);
-              } else if (pad.synth instanceof Tone.MembraneSynth || pad.synth instanceof Tone.MonoSynth) {
-                pad.synth.triggerAttackRelease(pad.note || 'C2', '16n', time, velocity);
-              }
-            }
-
-            // Trigger audio player
-            if (pad.player && pad.player.loaded) {
-              pad.player.start(time);
-            }
+            // Trigger the pad using the store's triggerPad function
+            triggerPad(padIndex, stepData.velocity || 0.8);
           }
         });
       },
