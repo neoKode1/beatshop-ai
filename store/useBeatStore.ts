@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import * as Tone from 'tone';
 import { DrumSynthesizer, BassSynthesizer } from '@/lib/audio/synthesizers';
 
@@ -174,7 +175,7 @@ interface BeatStore {
 
   // Pad actions
   assignSampleToPad: (padIndex: number, sample: Sample) => void;
-  triggerPad: (padIndex: number, velocity?: number) => void;
+  triggerPad: (padIndex: number, velocity?: number, scheduledTime?: number) => void | Promise<void>;
   setPadVolume: (padIndex: number, volume: number) => void;
   setPadPan: (padIndex: number, pan: number) => void;
   togglePadMute: (padIndex: number) => void;
@@ -288,7 +289,60 @@ const getPitchRatio = (semitones: number): number => {
   return Math.pow(2, semitones / 12);
 };
 
-export const useBeatStore = create<BeatStore>((set, get) => ({
+// Serializable pad data for persistence (without Tone.js objects)
+interface SerializablePad {
+  id: number;
+  sample: Sample | null;
+  volume: number;
+  pan: number;
+  muted: boolean;
+  solo: boolean;
+  note?: string;
+}
+
+// Convert pads to serializable format
+const serializePads = (pads: Pad[]): SerializablePad[] => {
+  return pads.map(pad => ({
+    id: pad.id,
+    sample: pad.sample,
+    volume: pad.volume,
+    pan: pad.pan,
+    muted: pad.muted,
+    solo: pad.solo,
+    note: pad.note,
+  }));
+};
+
+// Rehydrate pads with Tone.js objects
+const rehydratePads = (serializedPads: SerializablePad[]): Pad[] => {
+  return serializedPads.map(pad => {
+    let synth = null;
+    let player = null;
+
+    if (pad.sample) {
+      if (pad.sample.type === 'synth' && pad.sample.synthType) {
+        synth = createSynth(pad.sample.synthType);
+        if (synth) synth.volume.value = Tone.gainToDb(pad.volume);
+      } else if (pad.sample.type === 'audio' && pad.sample.url) {
+        // Only rehydrate non-blob URLs (built-in samples)
+        if (!pad.sample.url.startsWith('blob:')) {
+          player = new Tone.Player(pad.sample.url).toDestination();
+          player.volume.value = Tone.gainToDb(pad.volume);
+        }
+      }
+    }
+
+    return {
+      ...pad,
+      synth,
+      player,
+    };
+  });
+};
+
+export const useBeatStore = create<BeatStore>()(
+  persist(
+    (set, get) => ({
   bpm: 120,
   isPlaying: false,
   isRecording: false,
@@ -356,7 +410,27 @@ export const useBeatStore = create<BeatStore>((set, get) => ({
     set({ steps: createInitialSteps(16, length) });
   },
   setSwing: (swing) => set({ swing }),
-  setTimeSignature: (timeSignature) => set({ timeSignature }),
+  setTimeSignature: (timeSignature) => {
+    // Calculate number of steps based on time signature
+    // 4/4 = 16 steps (4 beats * 4 subdivisions)
+    // 3/4 = 12 steps (3 beats * 4 subdivisions)
+    // 5/4 = 20 steps (5 beats * 4 subdivisions)
+    // 6/8 = 24 steps (6 beats * 4 subdivisions)
+    // 7/8 = 28 steps (7 beats * 4 subdivisions)
+    // 8/8 = 32 steps (8 beats * 4 subdivisions)
+    // 9/8 = 36 steps (9 beats * 4 subdivisions)
+    // 12/8 = 48 steps (12 beats * 4 subdivisions)
+    // 16/16 = 64 steps (16 beats * 4 subdivisions)
+    const [numerator] = timeSignature.split('/').map(Number);
+    const stepsPerBeat = 4; // 16th note subdivisions
+    const newNumSteps = numerator * stepsPerBeat;
+
+    set({
+      timeSignature,
+      numSteps: newNumSteps,
+      steps: createInitialSteps(16, newNumSteps)
+    });
+  },
 
   // Metronome actions
   setMetronomeEnabled: (enabled) => set({ metronomeEnabled: enabled }),
@@ -437,7 +511,7 @@ export const useBeatStore = create<BeatStore>((set, get) => ({
     set({ pads });
   },
   
-  triggerPad: (padIndex, velocity = 0.8) => {
+  triggerPad: async (padIndex, velocity = 0.8, scheduledTime?: number) => {
     const pads = get().pads;
     const pad = pads[padIndex];
 
@@ -448,7 +522,15 @@ export const useBeatStore = create<BeatStore>((set, get) => ({
     const hasSolo = pads.some(p => p.solo);
     if (hasSolo && !pad.solo) return;
 
-    const time = Tone.now();
+    // For immediate playback (no scheduled time), ensure audio context is started
+    // This handles browser autoplay policy on first user interaction
+    if (scheduledTime === undefined && Tone.getContext().state !== 'running') {
+      await Tone.start();
+    }
+
+    // Use scheduled time if provided (from sequencer), otherwise use current time
+    // This ensures precise timing when triggered from the transport
+    const time = scheduledTime !== undefined ? scheduledTime : Tone.now();
     const vel = velocity;
 
     // Trigger synthesizer
@@ -848,5 +930,45 @@ export const useBeatStore = create<BeatStore>((set, get) => ({
   stopArrangement: () => {
     set({ isArrangementPlaying: false, arrangementPosition: 0 });
   },
-}));
+    }),
+    {
+      name: 'beatshop-storage', // localStorage key
+      storage: createJSONStorage(() => localStorage),
+
+      // Only persist these fields (exclude runtime state like isPlaying, synth, player)
+      partialize: (state) => ({
+        bpm: state.bpm,
+        pads: serializePads(state.pads),
+        padMode: state.padMode,
+        steps: state.steps,
+        numSteps: state.numSteps,
+        patternLength: state.patternLength,
+        swing: state.swing,
+        timeSignature: state.timeSignature,
+        midiNotes: state.midiNotes,
+        masterEffects: state.masterEffects,
+        patterns: state.patterns,
+        currentPatternId: state.currentPatternId,
+        arrangementClips: state.arrangementClips,
+        preferences: state.preferences,
+        metronomeEnabled: state.metronomeEnabled,
+        metronomeVolume: state.metronomeVolume,
+      }),
+
+      // Rehydrate Tone.js objects when loading from storage
+      onRehydrateStorage: () => (state) => {
+        if (state && state.pads) {
+          // Rehydrate pads with Tone.js synths/players
+          const rehydratedPads = rehydratePads(state.pads as unknown as SerializablePad[]);
+          // We need to set this after hydration
+          setTimeout(() => {
+            useBeatStore.setState({ pads: rehydratedPads });
+            // Also set BPM on Tone transport
+            Tone.getTransport().bpm.value = state.bpm;
+          }, 0);
+        }
+      },
+    }
+  )
+);
 

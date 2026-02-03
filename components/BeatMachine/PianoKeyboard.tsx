@@ -67,9 +67,14 @@ const PianoKeyboard: React.FC = () => {
   }, []);
 
   // Play note with chromatic pitch shifting (polyphonic - like a real piano)
-  const playNote = useCallback((note: string) => {
+  const playNote = useCallback(async (note: string) => {
     const pianoKey = PIANO_KEYS.find(k => k.note === note);
     if (!pianoKey) return;
+
+    // Ensure audio context is started (required for first user interaction)
+    if (Tone.getContext().state !== 'running') {
+      await Tone.start();
+    }
 
     // Trigger recording engine if recording
     const recordingEngine = (window as any).recordingEngine;

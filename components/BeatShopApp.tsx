@@ -32,14 +32,13 @@ const BeatShopApp: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-[#1A1A1A]">
-      {/* Header */}
-      <header className="bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-b-2 border-gray-900/50 px-6 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.5)] flex items-center justify-between">
-        <div className="flex items-center gap-6">
+      {/* Compact Header */}
+      <header className="bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-b border-gray-800/50 px-4 py-2 shadow-lg flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
               Beat Shop AI
             </h1>
-            <p className="text-sm text-gray-400">AI-Powered Beat Machine</p>
           </div>
 
           {/* Pattern List */}
@@ -47,20 +46,20 @@ const BeatShopApp: React.FC = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowProjectManager(true)}
-            className="p-2 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all"
+            className="p-2 rounded-md bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-colors"
             title="Project Manager"
           >
-            <FolderOpen size={20} />
+            <FolderOpen size={18} />
           </button>
           <button
             onClick={() => setShowPreferences(true)}
-            className="p-2 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-all"
+            className="p-2 rounded-md bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-colors"
             title="Preferences"
           >
-            <Settings size={20} />
+            <Settings size={18} />
           </button>
         </div>
       </header>
@@ -81,25 +80,31 @@ const BeatShopApp: React.FC = () => {
         </main>
 
         {/* Right Panel - AI Assistant (Collapsible) */}
-        <div className="relative">
-          {/* AI Panel */}
-          {isAIPanelOpen && (
-            <aside className="w-96 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-l-2 border-gray-900/50 overflow-y-auto shadow-[-2px_0_8px_rgba(0,0,0,0.5)] animate-slide-in">
-              <AIPanel />
-            </aside>
-          )}
+        {isAIPanelOpen && (
+          <aside className="w-96 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-l-2 border-gray-900/50 overflow-y-auto shadow-[-2px_0_8px_rgba(0,0,0,0.5)] relative">
+            <AIPanel />
 
-          {/* Toggle Button - Always visible */}
+            {/* Toggle Button - On left edge of panel */}
+            <button
+              onClick={toggleAIPanel}
+              className="absolute top-1/2 -translate-y-1/2 -left-6 z-10 w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-l-lg flex items-center justify-center text-gray-300 hover:text-white transition-all"
+              title="Hide AI Assistant"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </aside>
+        )}
+
+        {/* Toggle Button - When panel is closed */}
+        {!isAIPanelOpen && (
           <button
             onClick={toggleAIPanel}
-            className={`absolute top-1/2 -translate-y-1/2 z-10 w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg flex items-center justify-center text-gray-300 hover:text-white transition-all ${
-              isAIPanelOpen ? 'left-0 rounded-l-lg' : 'right-0 rounded-r-lg'
-            }`}
-            title={isAIPanelOpen ? 'Hide AI Assistant' : 'Show AI Assistant'}
+            className="w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-r-lg flex items-center justify-center text-gray-300 hover:text-white transition-all self-center"
+            title="Show AI Assistant"
           >
-            {isAIPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            <ChevronLeft size={16} />
           </button>
-        </div>
+        )}
       </div>
 
       {/* Preferences Modal */}
