@@ -1,5 +1,5 @@
 // Auto-generated audio samples - 358 total
-// Generated: 2026-02-02T19:34:11.677Z
+// Generated: 2026-02-03T14:29:17.019Z
 // DO NOT EDIT MANUALLY - Run 'node scripts/update-audio-samples.js' to regenerate
 
 import { Sample } from '@/store/useBeatStore';
@@ -842,7 +842,7 @@ export const AUDIO_SAMPLES: Sample[] = [
     "id": "sample_119",
     "name": "ESW Aurora Guitars 19   Holo   F# Major 160 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2019%20-%20Holo%20-%20F%23%20Major%20160%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2019%20-%20Holo%20-%20F#%20Major%20160%20BPM.wav",
     "category": "melodic"
   },
   {
@@ -863,49 +863,49 @@ export const AUDIO_SAMPLES: Sample[] = [
     "id": "sample_122",
     "name": "ESW Aurora Guitars 22   Chainlenium Full   C# Min 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2022%20-%20Chainlenium%20Full%20-%20C%23%20Min%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2022%20-%20Chainlenium%20Full%20-%20C#%20Min%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_123",
     "name": "ESW Aurora Guitars 23   Chainlenium Chords   C# Min 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2023%20-%20Chainlenium%20Chords%20-%20C%23%20Min%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2023%20-%20Chainlenium%20Chords%20-%20C#%20Min%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_124",
     "name": "ESW Aurora Guitars 24   Chainlenium Lead   C# Min 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2024%20-%20Chainlenium%20Lead%20-%20C%23%20Min%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2024%20-%20Chainlenium%20Lead%20-%20C#%20Min%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_125",
     "name": "ESW Aurora Guitars 25   Chainlenium Wide   C# Min 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2025%20-%20Chainlenium%20Wide%20-%20C%23%20Min%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2025%20-%20Chainlenium%20Wide%20-%20C#%20Min%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_126",
     "name": "ESW Aurora Guitars 26   Free Full   G# Maj 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2026%20-%20Free%20Full%20-%20G%23%20Maj%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2026%20-%20Free%20Full%20-%20G#%20Maj%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_127",
     "name": "ESW Aurora Guitars 27   Free Plucked   G# Maj 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2027%20-%20Free%20Plucked%20-%20G%23%20Maj%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2027%20-%20Free%20Plucked%20-%20G#%20Maj%20135%20BPM.wav",
     "category": "melodic"
   },
   {
     "id": "sample_128",
     "name": "ESW Aurora Guitars 28   Free Bass   G# Maj 135 BPM",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2028%20-%20Free%20Bass%20-%20G%23%20Maj%20135%20BPM.wav",
+    "url": "/samples/Echo+Sound+Works+-+Aurora+Guitars/ESW%20Aurora%20Guitars%2028%20-%20Free%20Bass%20-%20G#%20Maj%20135%20BPM.wav",
     "category": "bass"
   },
   {
@@ -1003,7 +1003,7 @@ export const AUDIO_SAMPLES: Sample[] = [
     "id": "sample_142",
     "name": "ESW Trap Snares   Snare 14   F#",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Trap+Snares+V.1/ESW%20Trap%20Snares%20-%20Snare%2014%20-%20F%23.wav",
+    "url": "/samples/Echo+Sound+Works+-+Trap+Snares+V.1/ESW%20Trap%20Snares%20-%20Snare%2014%20-%20F#.wav",
     "category": "snare"
   },
   {
@@ -1045,7 +1045,7 @@ export const AUDIO_SAMPLES: Sample[] = [
     "id": "sample_148",
     "name": "ESW Trap Snares   Snare 20   G#",
     "type": "audio",
-    "url": "/samples/Echo+Sound+Works+-+Trap+Snares+V.1/ESW%20Trap%20Snares%20-%20Snare%2020%20-%20G%23.wav",
+    "url": "/samples/Echo+Sound+Works+-+Trap+Snares+V.1/ESW%20Trap%20Snares%20-%20Snare%2020%20-%20G#.wav",
     "category": "snare"
   },
   {

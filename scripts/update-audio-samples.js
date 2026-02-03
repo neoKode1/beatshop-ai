@@ -25,13 +25,23 @@ const samples = [];
 let idx = 0;
 
 // Scan folders
-fs.readdirSync(samplesDir).forEach(folder => {
+console.log(`📁 Scanning: ${samplesDir}`);
+const folders = fs.readdirSync(samplesDir);
+console.log(`Found ${folders.length} items in samples directory`);
+
+folders.forEach(folder => {
   const folderPath = path.join(samplesDir, folder);
-  if (!fs.statSync(folderPath).isDirectory()) return;
-  
-  fs.readdirSync(folderPath).forEach(file => {
+  if (!fs.statSync(folderPath).isDirectory()) {
+    console.log(`⏭️  Skipping ${folder} (not a directory)`);
+    return;
+  }
+
+  const files = fs.readdirSync(folderPath);
+  const audioFiles = files.filter(f => audioExts.includes(path.extname(f).toLowerCase()));
+  console.log(`📂 ${folder}: ${audioFiles.length} audio files`);
+
+  audioFiles.forEach(file => {
     const ext = path.extname(file).toLowerCase();
-    if (!audioExts.includes(ext)) return;
 
     const name = path.basename(file, ext)
       .replace(/[-_]/g, ' ')
