@@ -133,7 +133,7 @@ const StepSequencer: React.FC = () => {
                       key={stepIndex}
                       onClick={() => toggleStep(padIndex, stepIndex)}
                       className={`
-                        w-12 h-12 rounded transition-all
+                        w-12 h-12 rounded-md transition-all
                         ${isActive
                           ? `${color.bg} ${color.hover} ${isDimmed ? 'opacity-30' : ''}`
                           : `${color.dim} hover:bg-gray-700`
