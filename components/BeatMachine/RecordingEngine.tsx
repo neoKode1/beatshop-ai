@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useBeatStore, MidiNote } from '@/store/useBeatStore';
 import * as Tone from 'tone';
 
@@ -152,7 +152,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
   };
 
   // Handle keyboard/MIDI input during recording
-  const handleNoteOn = (pitch: number, velocity: number = 0.8) => {
+  const handleNoteOn = useCallback((pitch: number, velocity: number = 0.8) => {
     // Use refs for accurate state checking
     if (!isRecordingRef.current || isCountingInRef.current) {
       console.log('❌ Note blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
@@ -169,9 +169,9 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
       startTime: relativeTime,
       pitch,
     });
-  };
+  }, []); // Empty deps - uses refs only
 
-  const handleNoteOff = (pitch: number) => {
+  const handleNoteOff = useCallback((pitch: number) => {
     // Use refs for accurate state checking
     if (!isRecordingRef.current || isCountingInRef.current) {
       console.log('❌ Note OFF blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
@@ -205,7 +205,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     } else {
       console.log('⚠️ No note start found for:', pitch);
     }
-  };
+  }, [addMidiNote, bpm]); // Include dependencies used in the function
 
   // Expose recording controls to parent components
   useEffect(() => {
@@ -219,7 +219,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     return () => {
       delete (window as any).recordingEngine;
     };
-  }, []); // Empty deps - functions use refs so they don't need to be recreated
+  }, [handleNoteOn, handleNoteOff]); // Include callback dependencies
 
   // Render count-in indicator
   if (isCountingIn) {
