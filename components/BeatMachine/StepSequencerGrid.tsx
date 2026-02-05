@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { useBeatStore, Pad, Step } from '@/store/useBeatStore';
 import { StepPropertiesPanel } from './StepPropertiesPanel';
+import GroovePanel from './GroovePanel';
 import { Volume2, VolumeX } from 'lucide-react';
 
 // Color palette for pads (matches PadGrid)
@@ -154,7 +155,10 @@ const StepSequencerGrid: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-700">
         <span className="text-xs font-bold text-gray-300">Step Sequencer</span>
-        <span className="text-[10px] text-gray-500">{numSteps} steps • Right-click for step properties</span>
+        <div className="flex items-center gap-3">
+          <GroovePanel compact />
+          <span className="text-[10px] text-gray-500">{numSteps} steps • Right-click for step properties</span>
+        </div>
       </div>
 
       {/* Grid - only show pads with samples */}

@@ -17,7 +17,8 @@ import StepSequencerGrid from './StepSequencerGrid';
 import VolumeMeter from '../VolumeMeter/VolumeMeter';
 import AudioExport from '../AudioExport/AudioExport';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
-import { Sliders, Piano, Music, Disc, ListMusic, Download, HelpCircle } from 'lucide-react';
+import MIDILearnPanel from './MIDILearnPanel';
+import { Sliders, Piano, Music, Disc, ListMusic, Download, HelpCircle, Settings } from 'lucide-react';
 
 // Layout modes for the workspace
 type LayoutMode = 'drumpad' | 'keys' | 'sequencer' | 'song' | 'mixer';
@@ -27,6 +28,7 @@ const BeatMachine: React.FC = () => {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('drumpad');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
+  const [showMIDILearnPanel, setShowMIDILearnPanel] = useState(false);
   const { selectedPadIndex, pads } = useBeatStore();
 
   // Get the selected pad to check if it has a sample
@@ -67,6 +69,11 @@ const BeatMachine: React.FC = () => {
       {/* Keyboard Shortcuts Panel */}
       {showShortcutsPanel && (
         <KeyboardShortcutsPanel onClose={() => setShowShortcutsPanel(false)} />
+      )}
+
+      {/* MIDI Learn Panel */}
+      {showMIDILearnPanel && (
+        <MIDILearnPanel onClose={() => setShowMIDILearnPanel(false)} />
       )}
 
       {/* Layout Tab Navigation - FL Studio Style */}
@@ -152,6 +159,18 @@ const BeatMachine: React.FC = () => {
           <span>Export</span>
         </button>
 
+        {/* MIDI Learn Button */}
+        <button
+          onClick={() => {
+            setShowMIDILearnPanel(true);
+            console.log('🎹 MIDI Learn panel opened');
+          }}
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-semibold transition-all text-gray-400 hover:text-orange-400 hover:bg-orange-600/20"
+          title="MIDI Learn"
+        >
+          <Settings size={14} />
+        </button>
+
         {/* Help Button - Keyboard Shortcuts */}
         <button
           onClick={() => {
@@ -206,8 +225,40 @@ const BeatMachine: React.FC = () => {
             <PianoRoll />
           </div>
         </div>
+      ) : layoutMode === 'keys' ? (
+        /* Keys Mode - Full-width keyboard layout */
+        <div className="flex-1 flex flex-col overflow-hidden pb-2">
+          {/* Full-width Piano Keyboard */}
+          <div
+            className="w-full"
+            style={{
+              height: '280px',
+              background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+              border: '1px solid #333',
+            }}
+          >
+            <PianoKeyboard />
+          </div>
+
+          {/* Piano Roll / Pattern Builder - Fills remaining screen space */}
+          <div
+            className="mt-4 flex-1 min-h-0"
+            style={{
+              background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+              border: '1px solid #333',
+            }}
+          >
+            <PianoRoll />
+          </div>
+        </div>
       ) : (
-        /* Drum Pad or Keys Mode - Hardware-Style Enclosure */
+        /* Drum Pad Mode - Hardware-Style Enclosure */
         <div className="flex-1 flex flex-col overflow-hidden pb-2">
           {/* Main Hardware Unit - MPC Studio Skin */}
           <MPCStudioSkin>
@@ -242,7 +293,7 @@ const BeatMachine: React.FC = () => {
               {/* Right side - Model name */}
               <div className="text-right">
                 <div className="text-xs font-mono text-gray-500 tracking-wide">
-                  {layoutMode === 'drumpad' ? 'STUDIO' : 'KEYS'}
+                  STUDIO
                 </div>
               </div>
             </div>
@@ -263,9 +314,12 @@ const BeatMachine: React.FC = () => {
                 <MPCLeftPanel />
               </div>
 
-              {/* CENTER - Pad Grid or Keyboard */}
-              <div className="flex-1 flex flex-col gap-2 h-full" style={{ minWidth: '320px', maxWidth: '420px' }}>
-                {/* Instrument (Pads or Keyboard) */}
+              {/* CENTER - Pad Grid - Stretches to fill available space */}
+              <div
+                className="flex-1 flex flex-col gap-2 h-full"
+                style={{ minWidth: '320px' }}
+              >
+                {/* Instrument (Pads) */}
                 <div
                   className="flex-1"
                   style={{
@@ -275,7 +329,7 @@ const BeatMachine: React.FC = () => {
                     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
                   }}
                 >
-                  {layoutMode === 'drumpad' ? <PadGrid /> : <PianoKeyboard />}
+                  <PadGrid />
                 </div>
 
                 {/* FL Sampler - Show when a pad with sample is selected */}

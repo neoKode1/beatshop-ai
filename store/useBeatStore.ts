@@ -625,8 +625,13 @@ interface BeatStore {
   toggleChannelGroupCollapsed: (groupId: string) => void;
   getFilteredChannels: () => number[]; // Returns pad indices matching current filter
 
-  // Global swing
+  // Global swing and groove templates
   setGlobalSwing: (swing: number) => void;
+  currentGrooveTemplate: string | null; // ID of currently applied groove template
+  grooveAmount: number; // 0-100% how much groove to apply
+  setGrooveTemplate: (templateId: string | null) => void;
+  setGrooveAmount: (amount: number) => void;
+  applyGrooveToPattern: () => void; // Apply current groove template to all steps
 
   // Arrangement actions
   addClipToArrangement: (patternId: string, startTime: number, track: number) => void;
@@ -950,6 +955,8 @@ export const useBeatStore = create<BeatStore>()(
   channelGroups: [],
   currentChannelFilter: 'all',
   globalSwing: 0,
+  currentGrooveTemplate: null,
+  grooveAmount: 100,
   maxPatterns: 999,
 
   // MPC Studio Mode States
@@ -3245,8 +3252,46 @@ export const useBeatStore = create<BeatStore>()(
     return group ? group.channelIds : [];
   },
 
-  // Global swing
+  // Global swing and groove templates
   setGlobalSwing: (swing) => set({ globalSwing: swing }),
+
+  setGrooveTemplate: (templateId) => {
+    set({ currentGrooveTemplate: templateId });
+    if (templateId) {
+      console.log(`🎵 Groove template set to: ${templateId}`);
+    } else {
+      console.log('🎵 Groove template cleared');
+    }
+  },
+
+  setGrooveAmount: (amount) => {
+    set({ grooveAmount: Math.max(0, Math.min(100, amount)) });
+    console.log(`🎵 Groove amount set to ${amount}%`);
+  },
+
+  applyGrooveToPattern: () => {
+    const state = get();
+    if (!state.currentGrooveTemplate) {
+      console.log('⚠️ No groove template selected');
+      return;
+    }
+
+    // Dynamic import to avoid circular dependencies
+    import('@/lib/audio/grooveTemplates').then(({ GROOVE_TEMPLATES, calculateGrooveOffset, calculateGrooveVelocity }) => {
+      const template = GROOVE_TEMPLATES.find(t => t.id === state.currentGrooveTemplate);
+      if (!template) return;
+
+      const updatedSteps = state.steps.map(step => {
+        if (!step.active) return step;
+        const newMicroTiming = calculateGrooveOffset(template, step.stepIndex, state.grooveAmount);
+        const newVelocity = calculateGrooveVelocity(template, step.stepIndex, step.velocity, state.grooveAmount);
+        return { ...step, microTiming: newMicroTiming, velocity: newVelocity };
+      });
+
+      set({ steps: updatedSteps });
+      console.log(`✅ Applied ${template.name} groove template to ${updatedSteps.filter(s => s.active).length} steps`);
+    });
+  },
 
   // Arrangement Management
   addClipToArrangement: (patternId, startTime, track) => {

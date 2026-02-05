@@ -322,9 +322,12 @@ const PianoKeyboard: React.FC = () => {
     setLoadedSample(null);
   };
 
+  // Count white keys for flex calculation
+  const whiteKeyCount = PIANO_KEYS.filter(k => k.type === 'white').length;
+
   return (
     <div
-      className={`piano-keyboard p-6 bg-gradient-to-br from-[#2A2A2A] to-[#1F1F1F] rounded-xl shadow-[inset_0_2px_8px_rgba(0,0,0,0.6),0_4px_12px_rgba(0,0,0,0.4)] border-2 transition-all duration-200 ${
+      className={`piano-keyboard h-full w-full p-2 bg-gradient-to-br from-[#2A2A2A] to-[#1F1F1F] rounded-xl shadow-[inset_0_2px_8px_rgba(0,0,0,0.6),0_4px_12px_rgba(0,0,0,0.4)] border-2 transition-all duration-200 flex flex-col ${
         isDragOverKeyboard
           ? 'border-purple-500 ring-2 ring-purple-500/50'
           : loadedSample
@@ -337,19 +340,19 @@ const PianoKeyboard: React.FC = () => {
     >
       {/* Loaded sample indicator */}
       {(loadedSample || isLoading) && (
-        <div className="mb-4 flex items-center justify-between bg-gradient-to-r from-green-900/30 to-green-800/20 rounded-lg px-4 py-2 border border-green-600/30">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-green-400 text-sm font-medium">
-              {isLoading ? 'Loading sample...' : `🎹 ${loadedSample?.name}`}
+        <div className="mb-2 flex items-center justify-between bg-gradient-to-r from-green-900/30 to-green-800/20 rounded-lg px-3 py-1.5 border border-green-600/30">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-green-400 text-xs font-medium">
+              {isLoading ? 'Loading...' : `🎹 ${loadedSample?.name}`}
             </span>
           </div>
           {loadedSample && (
             <button
               onClick={clearSample}
-              className="text-gray-400 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-900/20 transition-colors"
+              className="text-gray-400 hover:text-red-400 text-[10px] px-1.5 py-0.5 rounded hover:bg-red-900/20 transition-colors"
             >
-              ✕ Clear
+              ✕
             </button>
           )}
         </div>
@@ -358,18 +361,24 @@ const PianoKeyboard: React.FC = () => {
       {/* Drag overlay hint */}
       {isDragOverKeyboard && (
         <div className="absolute inset-0 flex items-center justify-center bg-purple-900/40 rounded-xl z-50 pointer-events-none">
-          <div className="text-purple-200 text-lg font-bold">
+          <div className="text-purple-200 text-sm font-bold">
             Drop sample for chromatic playback
           </div>
         </div>
       )}
 
-      <div className="flex gap-0 relative h-64">
-        {PIANO_KEYS.map((pianoKey) => {
+      {/* Piano keys container - fills available space */}
+      <div className="flex-1 flex relative min-h-0" style={{ minHeight: '180px' }}>
+        {PIANO_KEYS.map((pianoKey, index) => {
           const isActive = activeKeys.has(pianoKey.note);
           const isWhite = pianoKey.type === 'white';
           const isDragOver = dragOverKey === pianoKey.note;
           const hasSample = !!loadedSample;
+
+          // Calculate position for black keys (they overlap white keys)
+          // Black keys are positioned at specific offsets relative to white keys
+          const whiteKeyIndex = PIANO_KEYS.slice(0, index).filter(k => k.type === 'white').length;
+          const blackKeyOffset = isWhite ? 0 : `calc(${(whiteKeyIndex / whiteKeyCount) * 100}% - ${100 / whiteKeyCount / 3}%)`;
 
           return (
             <motion.button
@@ -380,7 +389,9 @@ const PianoKeyboard: React.FC = () => {
               onDragOver={(e) => handleDragOver(e, pianoKey.note)}
               onDragLeave={handleDragLeave}
               className={`
-                ${isWhite ? 'w-12 h-64 z-0' : 'w-8 h-40 -ml-4 -mr-4 z-10'}
+                ${isWhite
+                  ? 'relative h-full z-0 flex-1 min-w-0'
+                  : 'absolute h-[60%] z-10'}
                 ${isDragOver ? 'ring-2 ring-purple-500 ring-inset' : ''}
                 ${hasSample && isWhite ? 'ring-1 ring-green-500/30' : ''}
                 ${isWhite
@@ -395,19 +406,24 @@ const PianoKeyboard: React.FC = () => {
                       ? 'bg-gradient-to-b from-purple-800 to-purple-900 shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)]'
                       : 'bg-gradient-to-b from-gray-900 to-black shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)]'
                 }
-                border-2 ${isWhite ? 'border-gray-400/50' : 'border-black'}
-                rounded-b-lg
-                flex flex-col items-center justify-end pb-3
+                border ${isWhite ? 'border-gray-400/50' : 'border-black'}
+                rounded-b-md
+                flex flex-col items-center justify-end pb-2
                 transition-all duration-75
                 ${isWhite ? 'hover:bg-gradient-to-b hover:from-gray-200 hover:to-gray-300' : 'hover:bg-gradient-to-b hover:from-gray-800 hover:to-gray-900'}
-                active:scale-95
+                active:scale-[0.98]
               `}
-              whileTap={{ scale: 0.95 }}
+              style={isWhite ? {} : {
+                left: blackKeyOffset,
+                width: `calc(${100 / whiteKeyCount}% * 0.6)`,
+                top: 0
+              }}
+              whileTap={{ scale: 0.98 }}
             >
-              <span className={`text-[10px] font-bold ${isWhite ? 'text-gray-600' : 'text-gray-400'}`}>
+              <span className={`text-[9px] font-bold ${isWhite ? 'text-gray-600' : 'text-gray-400'}`}>
                 {pianoKey.key}
               </span>
-              <span className={`text-[9px] ${isWhite ? 'text-gray-500' : 'text-gray-500'} mt-1`}>
+              <span className={`text-[8px] ${isWhite ? 'text-gray-500' : 'text-gray-500'}`}>
                 {pianoKey.note}
               </span>
             </motion.button>
@@ -415,16 +431,16 @@ const PianoKeyboard: React.FC = () => {
         })}
       </div>
 
-      <div className="mt-4 text-center text-gray-400 text-sm">
+      <div className="mt-2 text-center text-gray-400 text-xs">
         {loadedSample ? (
           <>
             <p className="text-green-400">Playing: <span className="font-medium">{loadedSample.name}</span> chromatically</p>
-            <p className="text-xs mt-1 text-gray-500">Play chords! Notes sustain until you release the key</p>
+            <p className="text-[10px] mt-0.5 text-gray-500">Play chords! Notes sustain until you release the key</p>
           </>
         ) : (
           <>
             <p>Drop a sample here for chromatic playback</p>
-            <p className="text-xs mt-1">Or use keyboard to play mapped pads (A-B keys)</p>
+            <p className="text-[10px] mt-0.5">Or use keyboard to play mapped pads (A-B keys)</p>
           </>
         )}
       </div>

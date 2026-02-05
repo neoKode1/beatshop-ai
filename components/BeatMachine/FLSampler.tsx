@@ -5,8 +5,9 @@ import { useBeatStore } from '@/store/useBeatStore';
 import WaveSurfer from 'wavesurfer.js';
 import {
   X, Play, RotateCcw, Volume2, Sliders, Wand2,
-  ArrowLeftRight, Waves, Loader
+  ArrowLeftRight, Waves, Loader, Scissors
 } from 'lucide-react';
+import SampleSlicer from './SampleSlicer';
 import {
   normalizeAudio,
   removeDCOffset,
@@ -19,6 +20,7 @@ import {
   createAudioBuffer,
   audioBufferToUrl,
 } from '@/lib/audio/audioProcessing';
+import { useToast } from '@/components/Toast/Toast';
 
 // FL Studio color scheme
 const FL_COLORS = {
@@ -164,11 +166,13 @@ const SectionHeader: React.FC<{ title: string; icon?: React.ReactNode }> = ({ ti
 // Main FLSampler Component
 const FLSampler: React.FC = () => {
   const { pads, selectedPadIndex, setSelectedPadIndex, triggerPad, setPadEffects, assignSampleToPad } = useBeatStore();
+  const { showToast } = useToast();
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const [waveformError, setWaveformError] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'tools' | 'effects'>('tools');
   const [isProcessing, setIsProcessing] = useState<string | null>(null); // Track which effect is processing
+  const [showSlicer, setShowSlicer] = useState(false);
 
   const selectedPad = selectedPadIndex !== null ? pads[selectedPadIndex] : null;
 
@@ -195,6 +199,7 @@ const FLSampler: React.FC = () => {
   ) => {
     if (!selectedPad?.sample?.url || selectedPad.sample.type !== 'audio' || selectedPadIndex === null) {
       console.log(`⚠️ ${effectName}: No audio sample loaded`);
+      showToast(`No audio sample loaded`, 'warning');
       return;
     }
 
@@ -224,12 +229,14 @@ const FLSampler: React.FC = () => {
       setPadEffects(selectedPadIndex, { [effectKey]: true });
 
       console.log(`✅ ${effectName} applied successfully`);
+      showToast(`${effectName} applied successfully`, 'success');
     } catch (error) {
       console.error(`❌ ${effectName} failed:`, error);
+      showToast(`${effectName} failed`, 'error');
     } finally {
       setIsProcessing(null);
     }
-  }, [selectedPad, selectedPadIndex, assignSampleToPad, setPadEffects]);
+  }, [selectedPad, selectedPadIndex, assignSampleToPad, setPadEffects, showToast]);
 
   // Effect handlers
   const handleNormalize = () => applyAudioEffect('Normalize', normalizeAudio, 'normalized');
@@ -404,6 +411,16 @@ const FLSampler: React.FC = () => {
                   label="Swap Stereo"
                 />
               </div>
+              {/* Slice Button */}
+              {selectedPad?.sample?.type === 'audio' && (
+                <button
+                  onClick={() => setShowSlicer(true)}
+                  className="mt-3 w-full py-2 rounded text-xs font-medium bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 border border-orange-500/50 flex items-center justify-center gap-2 transition-all"
+                >
+                  <Scissors size={14} />
+                  Slice Sample
+                </button>
+              )}
             </div>
 
             {/* Time Stretching */}
@@ -453,6 +470,9 @@ const FLSampler: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Sample Slicer Modal */}
+      {showSlicer && <SampleSlicer onClose={() => setShowSlicer(false)} />}
     </div>
   );
 };
