@@ -30,6 +30,19 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     metronomeVolume,
     addMidiNote,
     clearMidiNotes,
+    // Recording Session Actions
+    startRecordingSession,
+    cancelRecordingSession,
+    commitRecordingSession,
+    recordNoteWithQuantize,
+    recordStepWithQuantize,
+    // Input Quantize Settings
+    inputQuantize,
+    blendRecording,
+    selectedTrackId,
+    tracks,
+    // Score Logger
+    addNoteToScoreLog,
   } = useBeatStore();
 
   const [countIn, setCountIn] = useState(0); // 0 = not counting, 1-4 = count beats
@@ -85,6 +98,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     await Tone.start();
     setIsCountingIn(true);
     setCountIn(1);
+    console.log('🎬 COUNT-IN STARTED at', bpm, 'BPM');
 
     const beatDuration = (60 / bpm) * 1000; // Duration of one beat in ms
 
@@ -92,6 +106,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     for (let i = 1; i <= 4; i++) {
       setTimeout(() => {
         setCountIn(i);
+        console.log(`⏱️ Count-in: ${i}/4`);
 
         // Play metronome click
         if (metronomeRef.current && (metronomeEnabled || isRecording)) {
@@ -101,14 +116,15 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
           metronomeRef.current.triggerAttackRelease(pitch, '32n');
         }
 
-        // Start recording RIGHT AFTER beat 4 click (not after another beat)
+        // Start recording on beat 5 (the downbeat after the count-in)
         if (i === 4) {
-          // Small delay to let the click sound, then start recording immediately
+          // Wait one full beat after beat 4, so recording starts on beat 5 (the "1")
           setTimeout(() => {
             setIsCountingIn(false);
             setCountIn(0);
+            console.log('🎬 Count-in complete - RECORDING STARTS NOW!');
             startRecording();
-          }, 50); // Just 50ms delay for the click to sound
+          }, beatDuration); // Full beat duration to land on beat 5
         }
       }, (i - 1) * beatDuration);
     }
@@ -117,38 +133,82 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
   const startRecording = () => {
     recordingStartTimeRef.current = Tone.now();
     recordedNotesRef.current = [];
-    clearMidiNotes(); // Clear existing notes
+
+    console.log('🔴 RECORDING STARTED', {
+      bpm,
+      blendMode: blendRecording ? 'OVERDUB (keeping existing notes)' : 'OVERWRITE (clearing notes)',
+      targetTrack: selectedTrackId || 'Piano Roll (no track selected)',
+      recordToStepSeq: inputQuantize.recordToStepSequencer,
+    });
+
+    // Start recording session (snapshot current state for cancel/revert)
+    startRecordingSession();
+
+    // Only clear notes if NOT in blend (overdub) mode
+    if (!blendRecording) {
+      clearMidiNotes();
+      console.log('🗑️ Cleared existing notes (overwrite mode)');
+    } else {
+      console.log('➕ Blend mode active - keeping existing notes');
+    }
+
     setIsPlaying(true);
-    
+
+    // Reset transport position to 0 before starting
+    // This ensures recording always starts at step 0, not at a previous position
+    Tone.getTransport().stop();
+    Tone.getTransport().position = 0;
+
     // Start transport for timing reference
     Tone.getTransport().start();
+    console.log('▶️ Transport started - Play notes now!');
   };
 
   const stopRecording = () => {
+    const notes = recordedNotesRef.current;
+    console.log('⏹️ RECORDING STOPPED', {
+      notesRecorded: notes.length,
+      notes: notes.map(n => ({ pitch: n.pitch, start: n.startTime, duration: n.duration })),
+    });
+
     setIsRecording(false);
     setIsPlaying(false);
     setIsCountingIn(false);
     setCountIn(0);
-    
+
     Tone.getTransport().stop();
     Tone.getTransport().position = 0;
 
-    // Process recorded notes
-    const notes = recordedNotesRef.current;
-    
-    // Quantize notes to 16th note grid (optional - can be made configurable)
-    const quantizedNotes = quantizeNotes(notes, bpm);
-    
-    // Add notes to store
-    quantizedNotes.forEach(note => addMidiNote(note));
-    
+    // Commit the recording session (finalize - keep recorded notes)
+    commitRecordingSession();
+    console.log('✅ Recording session committed - notes saved');
+
     // Callback with recorded notes
     if (onRecordingComplete) {
-      onRecordingComplete(quantizedNotes);
+      onRecordingComplete(notes);
     }
 
     recordedNotesRef.current = [];
     activeNotesRef.current.clear();
+  };
+
+  // Cancel recording and revert to pre-recording state
+  const cancelRecording = () => {
+    setIsRecording(false);
+    setIsPlaying(false);
+    setIsCountingIn(false);
+    setCountIn(0);
+
+    Tone.getTransport().stop();
+    Tone.getTransport().position = 0;
+
+    // Cancel the recording session (revert to pre-recording state)
+    cancelRecordingSession();
+
+    recordedNotesRef.current = [];
+    activeNotesRef.current.clear();
+
+    console.log('🚫 Recording cancelled - reverted to previous state');
   };
 
   // Handle keyboard/MIDI input during recording
@@ -187,25 +247,51 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
       const relativeTime = currentTime - recordingStartTimeRef.current;
       const duration = relativeTime - noteStart.startTime;
 
-      // Create MIDI note
+      const startTimeInSixteenths = timeToSixteenths(noteStart.startTime, bpm);
+      const durationInSixteenths = Math.max(1, timeToSixteenths(duration, bpm));
+
+      // Check if we should record to step sequencer instead of piano roll
+      if (inputQuantize.recordToStepSequencer && selectedTrackId) {
+        // Record to step sequencer (drum mode)
+        recordStepWithQuantize(selectedTrackId, startTimeInSixteenths, 0.8);
+        console.log('🥁 Recorded to step sequencer:', { trackId: selectedTrackId, step: startTimeInSixteenths });
+      } else {
+        // Record to piano roll with quantization
+        recordNoteWithQuantize({
+          pitch,
+          startTime: startTimeInSixteenths,
+          duration: durationInSixteenths,
+          velocity: 0.8,
+        });
+        console.log('🎵 Recorded to piano roll with quantize');
+      }
+
+      // Keep track of recorded notes for callback
       const note: MidiNote = {
         id: `note_${Date.now()}_${Math.random()}`,
         pitch,
-        startTime: timeToSixteenths(noteStart.startTime, bpm),
-        duration: Math.max(1, timeToSixteenths(duration, bpm)), // Minimum 1 sixteenth
+        startTime: startTimeInSixteenths,
+        duration: durationInSixteenths,
         velocity: 0.8,
       };
-
-      console.log('📝 Note recorded:', note);
       recordedNotesRef.current.push(note);
       activeNotesRef.current.delete(noteKey);
 
-      // Add note to display in real-time
-      addMidiNote(note);
+      // 📝 Score Logger: Always add notes to the 3-minute buffer (FL Studio behavior)
+      // The score logger captures ALL notes regardless of recording state
+      const msPerBeat = 60000 / bpm;
+      const msPerStep = msPerBeat / 4; // 16th notes
+      addNoteToScoreLog({
+        pitch,
+        velocity: 0.8,
+        startTime: Date.now() - (duration * 1000), // Approximate start time in ms
+        duration: durationInSixteenths * msPerStep, // Duration in ms
+      });
+      console.log('📝 Score Logger: Note added to 3-minute buffer', { pitch, duration: durationInSixteenths });
     } else {
       console.log('⚠️ No note start found for:', pitch);
     }
-  }, [addMidiNote, bpm]); // Include dependencies used in the function
+  }, [bpm, inputQuantize, selectedTrackId, recordNoteWithQuantize, recordStepWithQuantize, addNoteToScoreLog]); // Include dependencies
 
   // Expose recording controls to parent components
   useEffect(() => {
@@ -214,6 +300,7 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
       handleNoteOn,
       handleNoteOff,
       stopRecording,
+      cancelRecording, // New: Cancel and revert to pre-recording state
     };
 
     return () => {

@@ -2,18 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import BeatMachine from './BeatMachine/BeatMachine';
+import ArrangementView from './BeatMachine/ArrangementView';
 import SampleBrowser from './SampleBrowser/SampleBrowser';
 import AIPanel from './AIPanel/AIPanel';
-import Toolbar from './Toolbar/Toolbar';
-import PatternList from './PatternList/PatternList';
+import AIGeneratorPanel from './AIGenerator/AIGeneratorPanel';
+import FLToolbar from './Toolbar/FLToolbar';
 import ProjectManager from './ProjectManager/ProjectManager';
-import { ChevronLeft, ChevronRight, Settings, FolderOpen } from 'lucide-react';
+import SessionRestore from './SessionRestore/SessionRestore';
+import { ChevronLeft, ChevronRight, Settings, Wand2, MessageSquare } from 'lucide-react';
 import { useBeatStore } from '@/store/useBeatStore';
 
 const BeatShopApp: React.FC = () => {
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(true);
   const [showPreferences, setShowPreferences] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
+  const [aiPanelMode, setAIPanelMode] = useState<'generator' | 'assistant'>('generator');
+
+  // Get playback mode from store
+  const playbackMode = useBeatStore(state => state.playbackMode);
 
   // Load AI panel state from localStorage
   useEffect(() => {
@@ -32,37 +38,8 @@ const BeatShopApp: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-[#1A1A1A]">
-      {/* Compact Header */}
-      <header className="bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-b border-gray-800/50 px-4 py-2 shadow-lg flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-              Beat Shop AI
-            </h1>
-          </div>
-
-          {/* Pattern List */}
-          <PatternList />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowProjectManager(true)}
-            className="p-2 rounded-md bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-colors"
-            title="Project Manager"
-          >
-            <FolderOpen size={18} />
-          </button>
-          <button
-            onClick={() => setShowPreferences(true)}
-            className="p-2 rounded-md bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white transition-colors"
-            title="Preferences"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
-      </header>
+      {/* Session Restore Prompt */}
+      <SessionRestore />
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
@@ -72,23 +49,57 @@ const BeatShopApp: React.FC = () => {
         </aside>
 
         {/* Center Workspace */}
-        <main className="flex-1 flex flex-col bg-gradient-to-b from-[#2A2A2A] to-[#252525]">
-          <Toolbar />
-          <div className="flex-1 p-8 overflow-y-auto">
-            <BeatMachine />
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gradient-to-b from-[#2A2A2A] to-[#252525]">
+          <FLToolbar />
+          <div className="flex-1 p-3 min-h-0 overflow-hidden">
+            {/* Show BeatMachine in PAT mode, ArrangementView in SONG mode */}
+            {playbackMode === 'PAT' ? (
+              <BeatMachine />
+            ) : (
+              <ArrangementView />
+            )}
           </div>
         </main>
 
-        {/* Right Panel - AI Assistant (Collapsible) */}
+        {/* Right Panel - AI Panel (Collapsible) */}
         {isAIPanelOpen && (
-          <aside className="w-96 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-l-2 border-gray-900/50 overflow-y-auto shadow-[-2px_0_8px_rgba(0,0,0,0.5)] relative">
-            <AIPanel />
+          <aside className="w-96 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-l-2 border-gray-900/50 overflow-hidden shadow-[-2px_0_8px_rgba(0,0,0,0.5)] relative flex flex-col">
+            {/* AI Panel Mode Switcher */}
+            <div className="flex border-b border-gray-800 bg-gray-900/50">
+              <button
+                onClick={() => setAIPanelMode('generator')}
+                className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors ${
+                  aiPanelMode === 'generator'
+                    ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-400/10'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                }`}
+              >
+                <Wand2 size={14} />
+                AI Generator
+              </button>
+              <button
+                onClick={() => setAIPanelMode('assistant')}
+                className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors ${
+                  aiPanelMode === 'assistant'
+                    ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-400/10'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                }`}
+              >
+                <MessageSquare size={14} />
+                AI Assistant
+              </button>
+            </div>
+
+            {/* Panel Content */}
+            <div className="flex-1 overflow-y-auto">
+              {aiPanelMode === 'generator' ? <AIGeneratorPanel /> : <AIPanel />}
+            </div>
 
             {/* Toggle Button - On left edge of panel */}
             <button
               onClick={toggleAIPanel}
               className="absolute top-1/2 -translate-y-1/2 -left-6 z-10 w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-l-lg flex items-center justify-center text-gray-300 hover:text-white transition-all"
-              title="Hide AI Assistant"
+              title="Hide AI Panel"
             >
               <ChevronRight size={16} />
             </button>
@@ -100,7 +111,7 @@ const BeatShopApp: React.FC = () => {
           <button
             onClick={toggleAIPanel}
             className="w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-r-lg flex items-center justify-center text-gray-300 hover:text-white transition-all self-center"
-            title="Show AI Assistant"
+            title="Show AI Panel"
           >
             <ChevronLeft size={16} />
           </button>

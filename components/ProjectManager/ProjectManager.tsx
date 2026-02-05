@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useBeatStore } from '@/store/useBeatStore';
-import { Save, FolderOpen, Download, Upload, X } from 'lucide-react';
+import { Save, FolderOpen, Download, Upload, X, Clock, Check } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -14,6 +14,10 @@ interface Project {
   patterns: any[];
   arrangementClips: any[];
   masterSettings: any;
+  pads: any[]; // Include pad/sample assignments
+  steps: any[]; // Include step sequencer state
+  tracks: any[]; // Include tracks
+  midiNotes: any[]; // Include MIDI notes
 }
 
 export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -29,21 +33,34 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
 
-  const saveProject = () => {
-    if (!projectName.trim()) {
-      alert('Please enter a project name');
-      return;
-    }
+  // Serialize pads (remove Tone.js objects)
+  const serializePads = (pads: any[]) => {
+    return pads.map(pad => ({
+      id: pad.id,
+      sample: pad.sample,
+      volume: pad.volume,
+      pan: pad.pan,
+      muted: pad.muted,
+      solo: pad.solo,
+      note: pad.note,
+      effects: pad.effects,
+    }));
+  };
 
-    const project: Project = {
-      id: `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: projectName,
-      createdAt: Date.now(),
+  const createProjectData = (name: string, existingId?: string): Project => {
+    return {
+      id: existingId || `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      createdAt: existingId ? savedProjects.find(p => p.id === existingId)?.createdAt || Date.now() : Date.now(),
       modifiedAt: Date.now(),
       bpm: store.bpm,
       timeSignature: store.timeSignature,
       patterns: store.patterns,
       arrangementClips: store.arrangementClips,
+      pads: serializePads(store.pads),
+      steps: store.steps,
+      tracks: store.tracks,
+      midiNotes: store.midiNotes,
       masterSettings: {
         masterVolume: store.masterVolume,
         compressorThreshold: store.compressorThreshold,
@@ -62,56 +79,52 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
         patternLength: store.patternLength,
       },
     };
+  };
 
+  const saveProject = () => {
+    if (!projectName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+
+    const project = createProjectData(projectName);
     const updatedProjects = [...savedProjects, project];
     setSavedProjects(updatedProjects);
     localStorage.setItem('beatshop_projects', JSON.stringify(updatedProjects));
-    
+
+    // Also save as current working project for auto-restore
+    localStorage.setItem('beatshop_current_project', JSON.stringify(project));
+
     setProjectName('');
     setShowSaveDialog(false);
     alert(`Project "${project.name}" saved successfully!`);
   };
 
-  const loadProject = (project: Project) => {
-    if (!confirm(`Load project "${project.name}"? This will replace your current work.`)) {
+  const loadProject = (project: Project, skipConfirm = false) => {
+    if (!skipConfirm && !confirm(`Load project "${project.name}"? This will replace your current work.`)) {
       return;
     }
 
-    // Restore all project data
-    store.setBpm(project.bpm);
-    store.setTimeSignature(project.timeSignature);
-    
-    // Restore patterns
-    project.patterns.forEach(pattern => {
-      // Patterns are already in the correct format
-      const exists = store.patterns.find(p => p.id === pattern.id);
-      if (!exists) {
-        // Add pattern to store (we'll need to add this action)
-        // For now, we'll manually update the store
-      }
+    // Use the new restoreProject action to restore everything at once
+    store.restoreProject({
+      bpm: project.bpm,
+      timeSignature: project.timeSignature,
+      patterns: project.patterns,
+      arrangementClips: project.arrangementClips,
+      pads: project.pads,
+      steps: project.steps,
+      tracks: project.tracks,
+      midiNotes: project.midiNotes,
+      masterSettings: project.masterSettings,
     });
 
-    // Restore master settings
-    if (project.masterSettings) {
-      store.setMasterVolume(project.masterSettings.masterVolume);
-      store.setCompressorThreshold(project.masterSettings.compressorThreshold);
-      store.setCompressorRatio(project.masterSettings.compressorRatio);
-      store.setCompressorAttack(project.masterSettings.compressorAttack);
-      store.setCompressorRelease(project.masterSettings.compressorRelease);
-      store.setLimiterThreshold(project.masterSettings.limiterThreshold);
-      store.setEqLow(project.masterSettings.eqLow);
-      store.setEqMid(project.masterSettings.eqMid);
-      store.setEqHigh(project.masterSettings.eqHigh);
-      store.setDistortion(project.masterSettings.distortion);
-      store.setReverb(project.masterSettings.reverb);
-      store.setDelay(project.masterSettings.delay);
-      store.setStereoWidth(project.masterSettings.stereoWidth);
-      store.setSwing(project.masterSettings.swing);
-      store.setPatternLength(project.masterSettings.patternLength);
-    }
+    // Save as current working project
+    localStorage.setItem('beatshop_current_project', JSON.stringify(project));
 
     setShowLoadDialog(false);
-    alert(`Project "${project.name}" loaded successfully!`);
+    if (!skipConfirm) {
+      alert(`Project "${project.name}" loaded successfully!`);
+    }
   };
 
   const deleteProject = (projectId: string) => {

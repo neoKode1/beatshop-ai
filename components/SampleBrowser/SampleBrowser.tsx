@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useBeatStore, Sample, SynthType } from '@/store/useBeatStore';
 import { Music, Drum, Zap, FolderPlus, Folder, ChevronRight, ChevronDown, Trash2, X } from 'lucide-react';
 import * as Tone from 'tone';
-import { DrumSynthesizer, BassSynthesizer } from '@/lib/audio/synthesizers';
+import { previewSynth, SynthType as SynthTypeFromFactory } from '@/lib/audio/synthesizers';
+import { previewAudio } from '@/lib/audio/audioPlayerService';
+import { useDragSource } from '@/hooks/useDragDrop';
 import { AUDIO_SAMPLES } from '@/lib/data/audioSamples';
 
 // User folder structure for uploaded samples
@@ -13,6 +15,15 @@ interface UserFolder {
   name: string;
   samples: Sample[];
   subfolders: UserFolder[];
+  isExpanded: boolean;
+}
+
+// Stored folder structure (with File objects instead of blob URLs)
+interface StoredFolder {
+  id: string;
+  name: string;
+  files: { file: File; relativePath: string; category: Sample['category'] }[];
+  subfolders: StoredFolder[];
   isExpanded: boolean;
 }
 
@@ -56,31 +67,88 @@ const openDB = (): Promise<IDBDatabase> => {
   });
 };
 
-const saveFoldersToDB = async (folders: UserFolder[]): Promise<void> => {
+// Convert UserFolder to StoredFolder (extract File objects from blob URLs)
+const convertToStoredFolder = (folder: UserFolder, fileMap: Map<string, File>): StoredFolder => {
+  return {
+    id: folder.id,
+    name: folder.name,
+    files: folder.samples.map(sample => ({
+      file: fileMap.get(sample.url!) || new File([], 'unknown'),
+      relativePath: sample.name,
+      category: sample.category,
+    })),
+    subfolders: folder.subfolders.map(sf => convertToStoredFolder(sf, fileMap)),
+    isExpanded: folder.isExpanded,
+  };
+};
+
+const saveFoldersToDB = async (folders: UserFolder[], fileMap: Map<string, File>): Promise<void> => {
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, 'readwrite');
   const store = tx.objectStore(STORE_NAME);
-  // Clear and save all
+  // Clear and save all (convert to StoredFolder format)
   store.clear();
-  folders.forEach(folder => store.put(folder));
+  folders.forEach(folder => {
+    const storedFolder = convertToStoredFolder(folder, fileMap);
+    store.put(storedFolder);
+  });
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 };
 
-const loadFoldersFromDB = async (): Promise<UserFolder[]> => {
+// Convert StoredFolder back to UserFolder (recreate blob URLs from File objects)
+const convertFromStoredFolder = (storedFolder: StoredFolder, fileMap: Map<string, File>): UserFolder => {
+  const folder: UserFolder = {
+    id: storedFolder.id,
+    name: storedFolder.name,
+    samples: [],
+    subfolders: [],
+    isExpanded: storedFolder.isExpanded,
+  };
+
+  // Recreate blob URLs from File objects
+  storedFolder.files.forEach(({ file, relativePath, category }) => {
+    const blobUrl = URL.createObjectURL(file);
+    // Store File object in map for future persistence
+    fileMap.set(blobUrl, file);
+
+    const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+    folder.samples.push({
+      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      type: 'audio',
+      url: blobUrl,
+      category,
+    });
+  });
+
+  // Recursively convert subfolders
+  folder.subfolders = storedFolder.subfolders.map(sf => convertFromStoredFolder(sf, fileMap));
+
+  return folder;
+};
+
+const loadFoldersFromDB = async (): Promise<{ folders: UserFolder[]; fileMap: Map<string, File> }> => {
   try {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const request = store.getAll();
     return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || []);
+      request.onsuccess = () => {
+        const storedFolders = request.result || [];
+        const fileMap = new Map<string, File>();
+        // Convert StoredFolder[] to UserFolder[] (recreate blob URLs)
+        const userFolders = storedFolders.map((sf: StoredFolder) => convertFromStoredFolder(sf, fileMap));
+        resolve({ folders: userFolders, fileMap });
+      };
       request.onerror = () => reject(request.error);
     });
-  } catch {
-    return [];
+  } catch (error) {
+    console.error('Failed to load folders from IndexedDB:', error);
+    return { folders: [], fileMap: new Map() };
   }
 };
 
@@ -113,15 +181,23 @@ const SampleBrowser: React.FC = () => {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const assignSampleToPad = useBeatStore(state => state.assignSampleToPad);
 
+  // Map to track File objects for blob URLs (needed for persistence)
+  const fileMapRef = useRef<Map<string, File>>(new Map());
+
   // Load user folders from IndexedDB on mount
   useEffect(() => {
-    loadFoldersFromDB().then(setUserFolders);
+    loadFoldersFromDB().then(({ folders, fileMap }) => {
+      // Populate fileMapRef with File objects from loaded folders
+      fileMapRef.current = fileMap;
+      setUserFolders(folders);
+      console.log(`✅ Loaded ${folders.length} folders from IndexedDB with ${fileMap.size} files`);
+    });
   }, []);
 
   // Save user folders to IndexedDB when they change
   useEffect(() => {
     if (userFolders.length > 0) {
-      saveFoldersToDB(userFolders);
+      saveFoldersToDB(userFolders, fileMapRef.current);
     }
   }, [userFolders]);
 
@@ -165,6 +241,9 @@ const SampleBrowser: React.FC = () => {
 
         // Create blob URL for the file
         const blobUrl = URL.createObjectURL(file);
+
+        // Store File object in map for persistence
+        fileMapRef.current.set(blobUrl, file);
 
         const parts = relativePath.split('/');
         const fileName = parts[parts.length - 1];
@@ -277,56 +356,35 @@ const SampleBrowser: React.FC = () => {
     ? allSamplesWithUser
     : allSamplesWithUser.filter(s => s.category === selectedCategory);
 
+  // Use the unified drag source hook
+  const { draggedSample: hookDraggedSample, handlers: dragHandlers } = useDragSource();
+
+  // Sync hook state with local state for backward compatibility
+  useEffect(() => {
+    setDraggedSample(hookDraggedSample);
+  }, [hookDraggedSample]);
+
   const previewSample = async (sample: Sample) => {
-    await Tone.start();
-
     if (sample.type === 'synth' && sample.synthType) {
-      // Create temporary synth for preview
-      let synth: any;
-      switch (sample.synthType) {
-        case 'kick808': synth = DrumSynthesizer.createKick808(); break;
-        case 'kickAcoustic': synth = DrumSynthesizer.createKickAcoustic(); break;
-        case 'snare': synth = DrumSynthesizer.createSnare(); break;
-        case 'clap': synth = DrumSynthesizer.createClap(); break;
-        case 'hihatClosed': synth = DrumSynthesizer.createHiHatClosed(); break;
-        case 'hihatOpen': synth = DrumSynthesizer.createHiHatOpen(); break;
-        case 'rimShot': synth = DrumSynthesizer.createRimShot(); break;
-        case 'tom': synth = DrumSynthesizer.createTom(); break;
-        case 'shaker': synth = DrumSynthesizer.createShaker(); break;
-        case 'cowbell': synth = DrumSynthesizer.createCowbell(); break;
-        case 'subBass': synth = BassSynthesizer.createSubBass(); break;
-        default: synth = DrumSynthesizer.createKick808();
-      }
-
-      // Trigger the synth
-      const time = Tone.now();
-      if (synth instanceof Tone.NoiseSynth || synth instanceof Tone.MetalSynth) {
-        synth.triggerAttackRelease('16n', time, 0.8);
-      } else {
-        synth.triggerAttackRelease(sample.pitch || 'C2', '16n', time, 0.8);
-      }
-
-      // Dispose after playing
-      setTimeout(() => synth.dispose(), 1000);
+      // Use unified synth preview - handles creation, triggering, and disposal
+      await previewSynth(
+        sample.synthType as SynthTypeFromFactory,
+        sample.pitch || 'C2',
+        0.8
+      );
     } else if (sample.type === 'audio' && sample.url) {
-      // Preview audio file
-      const player = new Tone.Player(sample.url).toDestination();
-      await player.load(sample.url);
-      player.start();
-
-      // Dispose after playing
-      setTimeout(() => player.dispose(), 3000);
+      // Use unified audio preview - handles pooling and cleanup
+      await previewAudio(sample.url, 0.8);
     }
   };
 
+  // Wrap drag handlers to use the hook
   const handleDragStart = (e: React.DragEvent, sample: Sample) => {
-    setDraggedSample(sample);
-    e.dataTransfer.setData('application/json', JSON.stringify(sample));
-    e.dataTransfer.effectAllowed = 'copy';
+    dragHandlers.onDragStart(e, sample);
   };
 
   const handleDragEnd = () => {
-    setDraggedSample(null);
+    dragHandlers.onDragEnd();
   };
 
   // Render a folder item with samples
@@ -372,8 +430,11 @@ const SampleBrowser: React.FC = () => {
               className="flex items-center justify-between px-3 py-2 ml-6 rounded bg-gray-800/30 hover:bg-gray-700/50 cursor-move transition-all border border-transparent hover:border-purple-500/50"
               style={{ marginLeft: (depth + 1) * 12 + 8 }}
             >
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-300 truncate">{sample.name}</div>
+              <div
+                className="flex-1 min-w-0 cursor-pointer"
+                onClick={() => previewSample(sample)}
+              >
+                <div className="text-xs font-medium text-gray-300 truncate hover:text-purple-400 transition-colors">{sample.name}</div>
               </div>
               <button
                 onClick={() => previewSample(sample)}
@@ -390,10 +451,28 @@ const SampleBrowser: React.FC = () => {
 
   return (
     <div className="sample-browser h-full flex flex-col">
-      {/* Header with View Mode Toggle */}
+      {/* BEATSHOP Branding */}
+      <div className="p-4 border-b-2 border-gray-900/50 bg-gradient-to-r from-[#1A1A1A] to-[#252525]">
+        <h1
+          className="text-2xl font-black tracking-wider text-gray-100 text-center"
+          style={{
+            fontFamily: '"Orbitron", "Share Tech Mono", "Rajdhani", monospace',
+            letterSpacing: '3px',
+            textTransform: 'uppercase',
+            background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #f97316 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          BEATSHOP
+        </h1>
+      </div>
+
+      {/* Sample Library Header with View Mode Toggle */}
       <div className="p-4 border-b-2 border-gray-900/50">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-300">Sample Library</h2>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Sample Library</h2>
         </div>
 
         {/* View Mode Tabs */}
@@ -476,8 +555,11 @@ const SampleBrowser: React.FC = () => {
                 className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 hover:from-gray-700/80 hover:to-gray-800/80 rounded-lg p-3 cursor-move transition-all border border-gray-700/50 hover:border-purple-500/70 shadow-md"
               >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-gray-200">{sample.name}</div>
+                  <div
+                    className="flex-1 cursor-pointer"
+                    onClick={() => previewSample(sample)}
+                  >
+                    <div className="text-sm font-medium text-gray-200 hover:text-purple-400 transition-colors">{sample.name}</div>
                     <div className="text-xs text-gray-500 uppercase font-semibold">{sample.category}</div>
                   </div>
                   <button

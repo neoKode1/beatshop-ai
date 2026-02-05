@@ -1,6 +1,6 @@
-# Adding Audio Samples to Beat Shop AI
+# Adding Audio Samples to BeatShop AI
 
-Beat Shop AI now supports **both synthesizers and audio files (WAV/MP3)**!
+BeatShop AI now supports **both synthesizers and audio files (WAV/MP3)**!
 
 ## 📁 Folder Structure
 

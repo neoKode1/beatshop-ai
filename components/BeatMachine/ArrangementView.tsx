@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useBeatStore, ArrangementClip } from '@/store/useBeatStore';
-import { Play, Pause, Trash2, Square, Download } from 'lucide-react';
+import { Play, Pause, Trash2, Square, Download, Music, Drum } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ArrangementPlayback from './ArrangementPlayback';
 import AudioExport from '../AudioExport/AudioExport';
@@ -105,41 +105,95 @@ const ArrangementView: React.FC = () => {
           </div>
         </div>
 
-      {/* Timeline */}
-      <div className="flex-1 overflow-auto">
-        <div className="relative" style={{ minWidth: NUM_BARS * BAR_WIDTH, minHeight: NUM_TRACKS * TRACK_HEIGHT }}>
-          {/* Grid Background */}
-          <div className="absolute inset-0">
-            {/* Vertical lines (bars) */}
-            {Array.from({ length: NUM_BARS + 1 }).map((_, i) => (
-              <div
-                key={`vline-${i}`}
-                className={`absolute top-0 bottom-0 ${i % 4 === 0 ? 'border-l-2 border-gray-700' : 'border-l border-gray-800/50'}`}
-                style={{ left: i * BAR_WIDTH }}
-              >
-                {i % 4 === 0 && (
-                  <div className="absolute -top-6 left-1 text-xs text-gray-500 font-mono">
-                    {i}
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {/* Horizontal lines (tracks) */}
-            {Array.from({ length: NUM_TRACKS + 1 }).map((_, i) => (
-              <div
-                key={`hline-${i}`}
-                className="absolute left-0 right-0 border-t border-gray-800/50"
-                style={{ top: i * TRACK_HEIGHT }}
-              >
-                {i < NUM_TRACKS && (
-                  <div className="absolute -left-12 top-2 text-xs text-gray-500 font-bold">
-                    Track {i + 1}
-                  </div>
-                )}
-              </div>
-            ))}
+      {/* Main Content - Pattern Panel + Timeline */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Side - Pattern Panel */}
+        <div className="w-48 border-r-2 border-gray-800/50 flex flex-col bg-gradient-to-b from-[#252525] to-[#1A1A1A]">
+          <div className="p-3 border-b border-gray-800/50">
+            <h3 className="text-sm font-bold text-gray-300">Patterns</h3>
+            <p className="text-xs text-gray-500">Drag to timeline</p>
           </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {patterns.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-xs">
+                <p>No patterns created</p>
+                <p className="mt-1">Switch to PAT mode to create patterns</p>
+              </div>
+            ) : (
+              patterns.map((pattern) => (
+                <div
+                  key={pattern.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/json', JSON.stringify({
+                      type: 'pattern',
+                      patternId: pattern.id,
+                    }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  className={`p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all border-2 ${
+                    pattern.type === 'drum'
+                      ? 'bg-blue-900/40 border-blue-700/50 hover:bg-blue-800/50 hover:border-blue-600'
+                      : 'bg-green-900/40 border-green-700/50 hover:bg-green-800/50 hover:border-green-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {pattern.type === 'drum' ? (
+                      <Drum size={14} className="text-blue-400" />
+                    ) : (
+                      <Music size={14} className="text-green-400" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-gray-200 truncate">
+                        {pattern.name}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {pattern.length} bars
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right Side - Timeline */}
+        <div className="flex-1 overflow-auto">
+          <div className="relative" style={{ minWidth: NUM_BARS * BAR_WIDTH, minHeight: NUM_TRACKS * TRACK_HEIGHT }}>
+            {/* Grid Background */}
+            <div className="absolute inset-0">
+              {/* Vertical lines (bars) */}
+              {Array.from({ length: NUM_BARS + 1 }).map((_, i) => (
+                <div
+                  key={`vline-${i}`}
+                  className={`absolute top-0 bottom-0 ${i % 4 === 0 ? 'border-l-2 border-gray-700' : 'border-l border-gray-800/50'}`}
+                  style={{ left: i * BAR_WIDTH }}
+                >
+                  {i % 4 === 0 && (
+                    <div className="absolute -top-6 left-1 text-xs text-gray-500 font-mono">
+                      {i}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Horizontal lines (tracks) */}
+              {Array.from({ length: NUM_TRACKS + 1 }).map((_, i) => (
+                <div
+                  key={`hline-${i}`}
+                  className="absolute left-0 right-0 border-t border-gray-800/50"
+                  style={{ top: i * TRACK_HEIGHT }}
+                >
+                  {i < NUM_TRACKS && (
+                    <div className="absolute -left-12 top-2 text-xs text-gray-500 font-bold">
+                      Track {i + 1}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
           {/* Playhead */}
           {isArrangementPlaying && (
@@ -225,6 +279,7 @@ const ArrangementView: React.FC = () => {
               </motion.div>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

@@ -42,7 +42,16 @@ const semitoneToPlaybackRate = (semitone: number, rootSemitone: number = 0): num
 };
 
 const PianoKeyboard: React.FC = () => {
-  const { pads, padMode, assignSampleToPad } = useBeatStore();
+  const {
+    pads,
+    padMode,
+    assignSampleToPad,
+    // Track system
+    addTrack,
+    isRecording,
+    isPlaying,
+    isCountingIn,
+  } = useBeatStore();
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [isDragOverKeyboard, setIsDragOverKeyboard] = useState(false);
@@ -53,6 +62,9 @@ const PianoKeyboard: React.FC = () => {
   const bufferRef = useRef<Tone.ToneAudioBuffer | null>(null);
   // Track active players per note for polyphonic playback (like a real piano)
   const activePlayersRef = useRef<Map<string, Tone.Player>>(new Map());
+
+  // Track ID for the current recording session
+  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -65,6 +77,26 @@ const PianoKeyboard: React.FC = () => {
       activePlayersRef.current.clear();
     };
   }, []);
+
+  // 🎹 AUTO-CREATE TRACK: When recording starts with a loaded sample, create instrument track
+  useEffect(() => {
+    // Only create track if:
+    // 1. We have a loaded sample
+    // 2. Recording is active
+    // 3. Not counting in
+    // 4. We haven't created a track yet for this recording session
+    if (loadedSample && isRecording && !isCountingIn && !currentTrackId) {
+      const trackId = addTrack('instrument', loadedSample);
+      setCurrentTrackId(trackId);
+      console.log('✅ Created instrument track for piano recording:', trackId, loadedSample.name);
+    }
+
+    // Reset track ID when recording stops
+    if (!isRecording && currentTrackId) {
+      setCurrentTrackId(null);
+      console.log('🛑 Recording stopped, reset track ID');
+    }
+  }, [loadedSample, isRecording, isCountingIn, currentTrackId, addTrack]);
 
   // Play note with chromatic pitch shifting (polyphonic - like a real piano)
   const playNote = useCallback(async (note: string) => {
