@@ -5,7 +5,7 @@ import { useBeatStore } from '@/store/useBeatStore';
 import WaveSurfer from 'wavesurfer.js';
 import {
   X, Play, RotateCcw, Volume2, Sliders, Wand2,
-  ArrowLeftRight, Waves, Loader, Scissors
+  ArrowLeftRight, Waves, Loader, Scissors, Music, Trash2
 } from 'lucide-react';
 import SampleSlicer from './SampleSlicer';
 import {
@@ -165,7 +165,7 @@ const SectionHeader: React.FC<{ title: string; icon?: React.ReactNode }> = ({ ti
 
 // Main FLSampler Component
 const FLSampler: React.FC = () => {
-  const { pads, selectedPadIndex, setSelectedPadIndex, triggerPad, setPadEffects, assignSampleToPad } = useBeatStore();
+  const { pads, selectedPadIndex, setSelectedPadIndex, triggerPad, setPadEffects, assignSampleToPad, clearPadSample, padMode, setPadMode } = useBeatStore();
   const { showToast } = useToast();
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -322,18 +322,45 @@ const FLSampler: React.FC = () => {
               ♪ INS
             </button>
           </div>
+          {/* Chromatic Mode Toggle - MPC style */}
+          <button
+            onClick={() => setPadMode(padMode === 'chromatic' ? 'drum' : 'chromatic')}
+            className={`px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded transition-all flex items-center gap-1.5 ${
+              padMode === 'chromatic'
+                ? 'bg-cyan-500/30 text-cyan-400 border border-cyan-500/50 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                : 'bg-gray-700/50 text-gray-500 border border-gray-600/30 hover:bg-gray-700 hover:text-gray-300'
+            }`}
+            title={padMode === 'chromatic'
+              ? 'CHROMATIC: All 16 pads play one sample at different pitches (C2-D#3)'
+              : 'DRUM: Each pad plays its own sample (one-shot mode)'}
+          >
+            <Music size={11} />
+            {padMode === 'chromatic' ? 'CHROM' : 'DRUM'}
+          </button>
           <span className="text-xs text-gray-300 font-medium">
             Pad {selectedPadIndex + 1} • {selectedPad.sample?.name || 'Empty'}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={handlePreview} className="p-1.5 bg-green-600/30 hover:bg-green-600/50 rounded text-green-400 border border-green-600/50">
+          <button onClick={handlePreview} className="p-1.5 bg-green-600/30 hover:bg-green-600/50 rounded text-green-400 border border-green-600/50" title="Preview sample">
             <Play size={12} />
           </button>
-          <button onClick={handleReset} className="p-1.5 bg-gray-700/50 hover:bg-gray-600/50 rounded text-gray-400">
+          <button onClick={handleReset} className="p-1.5 bg-gray-700/50 hover:bg-gray-600/50 rounded text-gray-400" title="Reset effects">
             <RotateCcw size={12} />
           </button>
-          <button onClick={handleClose} className="p-1.5 bg-gray-700/50 hover:bg-red-600/50 rounded text-gray-400 hover:text-red-400">
+          <button
+            onClick={() => {
+              if (selectedPadIndex !== null) {
+                clearPadSample(selectedPadIndex);
+                setSelectedPadIndex(null);
+              }
+            }}
+            className="p-1.5 bg-gray-700/50 hover:bg-red-600/50 rounded text-gray-400 hover:text-red-400"
+            title="Remove sample from pad"
+          >
+            <Trash2 size={12} />
+          </button>
+          <button onClick={handleClose} className="p-1.5 bg-gray-700/50 hover:bg-gray-600/50 rounded text-gray-400" title="Close panel">
             <X size={12} />
           </button>
         </div>

@@ -47,10 +47,10 @@ folders.forEach(folder => {
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, l => l.toUpperCase());
 
-    // For Next.js public folder, we need to encode spaces but keep + as literal
-    // encodeURIComponent would turn + into %2B which doesn't work with Next.js
-    const encodedFile = file.replace(/ /g, '%20');
-    const encodedFolder = folder.replace(/ /g, '%20');
+    // Use encodeURIComponent to properly encode ALL special characters (#, ?, &, etc.)
+    // Then restore + from %2B because Next.js serves files with literal + in filenames
+    const encodedFile = encodeURIComponent(file).replace(/%2B/gi, '+');
+    const encodedFolder = encodeURIComponent(folder).replace(/%2B/gi, '+');
 
     samples.push({
       id: `sample_${idx++}`,

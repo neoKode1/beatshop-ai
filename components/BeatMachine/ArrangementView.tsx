@@ -96,7 +96,7 @@ const ArrangementView: React.FC = () => {
             <button
               onClick={() => setShowAudioExport(true)}
               disabled={arrangementClips.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all"
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all"
               title="Export to audio file"
             >
               <Download size={18} />
@@ -149,7 +149,7 @@ const ArrangementView: React.FC = () => {
                         {pattern.name}
                       </div>
                       <div className="text-[10px] text-gray-500">
-                        {pattern.length} bars
+                        {pattern.numBars || 1} bars
                       </div>
                     </div>
                   </div>
@@ -198,10 +198,10 @@ const ArrangementView: React.FC = () => {
           {/* Playhead */}
           {isArrangementPlaying && (
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.8)] z-50 pointer-events-none"
+              className="absolute top-0 bottom-0 w-0.5 bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)] z-50 pointer-events-none"
               style={{ left: arrangementPosition * BAR_WIDTH }}
             >
-              <div className="absolute -top-2 -left-2 w-4 h-4 bg-purple-500 rounded-full shadow-lg" />
+              <div className="absolute -top-2 -left-2 w-4 h-4 bg-amber-500 rounded-full shadow-lg" />
             </div>
           )}
 
@@ -218,7 +218,7 @@ const ArrangementView: React.FC = () => {
               {Array.from({ length: NUM_BARS }).map((_, barIndex) => (
                 <div
                   key={`drop-${trackIndex}-${barIndex}`}
-                  className="absolute hover:bg-purple-500/10 transition-colors"
+                  className="absolute hover:bg-amber-500/10 transition-colors"
                   style={{
                     left: barIndex * BAR_WIDTH,
                     width: BAR_WIDTH,

@@ -14,6 +14,7 @@ const MPCRightPanel: React.FC = () => {
     isRecording,
     isArmed,
     togglePlayback,
+    stopPlayback,
     toggleRecording,
     // MPC actions
     shiftPressed,
@@ -164,11 +165,11 @@ const MPCRightPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Transport buttons */}
+        {/* Transport buttons - synced with main FLToolbar transport */}
         <div className="grid grid-cols-5 gap-0.5">
           <MPCSmallButton label="REC" active={isRecording || isArmed} color="red" size="xs" onClick={toggleRecording} />
           <MPCSmallButton label="ODUB" active={overdubEnabled} color="orange" size="xs" onClick={toggleOverdub} />
-          <MPCSmallButton label="STOP" color="gray" size="xs" onClick={() => isPlaying && togglePlayback()} />
+          <MPCSmallButton label="STOP" color="gray" size="xs" onClick={stopPlayback} />
           <MPCSmallButton label="PLAY" active={isPlaying} color="green" size="xs" onClick={togglePlayback} />
           <MPCSmallButton label="▶" subLabel="START" color="green" size="xs" onClick={playFromStart} />
         </div>

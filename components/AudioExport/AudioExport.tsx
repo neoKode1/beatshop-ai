@@ -13,7 +13,7 @@ interface AudioExportProps {
 export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode = 'pattern' }) => {
   const {
     arrangementClips, patterns, bpm,
-    steps, pads, midiNotes, numBars, numSteps, currentPatternIndex,
+    steps, pads, midiNotes, numBars, currentPatternIndex,
     tracks
   } = useBeatStore();
   const [isExporting, setIsExporting] = useState(false);
@@ -194,8 +194,10 @@ export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode =
         const time = `0:${stepTime}:0`;
 
         Tone.getTransport().schedule((transportTime) => {
-          if (track.sampleUrl) {
-            const player = new Tone.Player(track.sampleUrl).toDestination();
+          // Use track.sample.url for audio files or track.player for already loaded players
+          const sampleUrl = track.sample?.url;
+          if (sampleUrl) {
+            const player = new Tone.Player(sampleUrl).toDestination();
             player.volume.value = Tone.gainToDb(step.velocity || 0.8);
             player.start(transportTime);
             console.log(`🎵 Track step: ${track.name} at beat ${stepTime.toFixed(2)}`);
@@ -357,7 +359,7 @@ export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode =
                     onClick={() => setExportFormat('wav')}
                     className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all ${
                       exportFormat === 'wav'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-amber-600 text-white'
                         : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
                     }`}
                   >
@@ -367,7 +369,7 @@ export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode =
                     onClick={() => setExportFormat('mp3')}
                     className={`flex-1 px-4 py-2 rounded-lg font-bold transition-all ${
                       exportFormat === 'mp3'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-amber-600 text-white'
                         : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
                     }`}
                   >
@@ -382,7 +384,7 @@ export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode =
                 <select
                   value={exportQuality}
                   onChange={(e) => setExportQuality(e.target.value as any)}
-                  className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
                   <option value="high">High (48kHz, 24-bit)</option>
                   <option value="medium">Medium (44.1kHz, 16-bit)</option>
@@ -420,13 +422,13 @@ export const AudioExport: React.FC<AudioExportProps> = ({ onClose, defaultMode =
               {/* Export Progress */}
               <div className="space-y-4">
                 <div className="flex items-center justify-center gap-3">
-                  <Loader size={24} className="text-purple-500 animate-spin" />
+                  <Loader size={24} className="text-amber-500 animate-spin" />
                   <span className="text-gray-300 font-bold">Exporting...</span>
                 </div>
 
                 <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-300"
+                    className="h-full bg-gradient-to-r from-amber-600 to-orange-600 transition-all duration-300"
                     style={{ width: `${exportProgress}%` }}
                   />
                 </div>

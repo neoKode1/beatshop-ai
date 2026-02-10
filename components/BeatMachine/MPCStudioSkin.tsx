@@ -6,7 +6,7 @@ import React from 'react';
 const MPCStudioSkin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div
-      className="relative mx-auto"
+      className="relative w-full"
       style={{
         background: 'linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 5%, #1a1a1a 95%, #0a0a0a 100%)',
         borderRadius: '12px',

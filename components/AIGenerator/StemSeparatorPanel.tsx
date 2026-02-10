@@ -29,7 +29,7 @@ interface StemInfo {
 const STEM_INFO: StemInfo[] = [
   { id: 'vocals', name: 'Vocals', icon: <Mic size={16} />, color: 'text-pink-400' },
   { id: 'drums', name: 'Drums', icon: <Drum size={16} />, color: 'text-orange-400' },
-  { id: 'bass', name: 'Bass', icon: <Volume2 size={16} />, color: 'text-purple-400' },
+  { id: 'bass', name: 'Bass', icon: <Volume2 size={16} />, color: 'text-amber-400' },
   { id: 'other', name: 'Other', icon: <Guitar size={16} />, color: 'text-blue-400' },
 ];
 
@@ -100,7 +100,7 @@ const StemSeparatorPanel: React.FC = () => {
     <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <Layers className="text-purple-400" size={20} />
+        <Layers className="text-amber-400" size={20} />
         <h3 className="text-lg font-bold text-white">Stem Separator</h3>
       </div>
       
@@ -120,7 +120,7 @@ const StemSeparatorPanel: React.FC = () => {
       {!audioUrl ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="p-6 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800/50 hover:border-purple-500/50 transition-all"
+          className="p-6 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800/50 hover:border-amber-500/50 transition-all"
         >
           <div className="flex flex-col items-center gap-2 text-center">
             <Upload size={32} className="text-gray-500" />
@@ -162,7 +162,7 @@ const StemSeparatorPanel: React.FC = () => {
               className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
                 isProcessing
                   ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg'
+                  : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg'
               }`}
             >
               {isProcessing ? (
@@ -190,13 +190,13 @@ const StemSeparatorPanel: React.FC = () => {
                 return (
                   <div
                     key={stem.id}
-                    className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all"
+                    className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-amber-500/50 transition-all"
                   >
                     <button
                       onClick={() => togglePlayStem(stem.id, url)}
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         playingId === stem.id
-                          ? 'bg-purple-600'
+                          ? 'bg-amber-600'
                           : 'bg-gray-700 hover:bg-gray-600'
                       }`}
                     >

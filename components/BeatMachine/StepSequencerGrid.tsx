@@ -4,7 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { useBeatStore, Pad, Step } from '@/store/useBeatStore';
 import { StepPropertiesPanel } from './StepPropertiesPanel';
 import GroovePanel from './GroovePanel';
-import { Volume2, VolumeX } from 'lucide-react';
+import { VolumeX } from 'lucide-react';
 
 // Color palette for pads (matches PadGrid)
 const PAD_COLORS = [
@@ -68,9 +68,9 @@ interface PadRowProps {
 const PadRow: React.FC<PadRowProps> = ({
   pad, padIndex, steps, numSteps, currentStep, isPlaying, onStepRightClick
 }) => {
-  const { toggleStep, setPadMuted, setPadSolo } = useBeatStore();
+  const { toggleStep, togglePadMute, togglePadSolo } = useBeatStore();
   const color = PAD_COLORS[padIndex % PAD_COLORS.length];
-  
+
   // Get steps for this pad
   const padSteps = new Map<number, Step>();
   steps.filter(s => s.padIndex === padIndex).forEach(s => {
@@ -80,7 +80,7 @@ const PadRow: React.FC<PadRowProps> = ({
   return (
     <div className="flex items-center gap-2 py-0.5">
       {/* Pad Info */}
-      <div 
+      <div
         className="w-16 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono truncate"
         style={{ backgroundColor: `${color}40` }}
       >
@@ -92,7 +92,7 @@ const PadRow: React.FC<PadRowProps> = ({
 
       {/* Mute/Solo buttons */}
       <button
-        onClick={() => setPadMuted(padIndex, !pad.muted)}
+        onClick={() => togglePadMute(padIndex)}
         className={`w-4 h-4 flex items-center justify-center rounded text-[8px] ${
           pad.muted ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'
         }`}
@@ -101,7 +101,7 @@ const PadRow: React.FC<PadRowProps> = ({
         M
       </button>
       <button
-        onClick={() => setPadSolo(padIndex, !pad.solo)}
+        onClick={() => togglePadSolo(padIndex)}
         className={`w-4 h-4 flex items-center justify-center rounded text-[8px] ${
           pad.solo ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'
         }`}

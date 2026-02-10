@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useBeatStore } from '@/store/useBeatStore';
-import { GROOVE_TEMPLATES, GrooveTemplate } from '@/lib/audio/grooveTemplates';
+import { GROOVE_TEMPLATES } from '@/lib/audio/grooveTemplates';
 import { useToast } from '@/components/Toast/Toast';
 import { Music, Zap, Check, ChevronDown, Percent } from 'lucide-react';
 
@@ -36,7 +36,7 @@ const GroovePanel: React.FC<GroovePanelProps> = ({ compact = false }) => {
   const categoryColors: Record<string, string> = {
     mpc: 'text-orange-400 bg-orange-500/20',
     sp1200: 'text-cyan-400 bg-cyan-500/20',
-    classic: 'text-purple-400 bg-purple-500/20',
+    classic: 'text-amber-400 bg-amber-500/20',
     custom: 'text-green-400 bg-green-500/20',
   };
 
@@ -149,7 +149,7 @@ interface GrooveDropdownProps {
 }
 
 const GrooveDropdown: React.FC<GrooveDropdownProps> = ({
-  currentTemplate, onSelect, onClose, categoryColors
+  currentTemplate, onSelect, categoryColors
 }) => {
   const categories = ['mpc', 'sp1200', 'classic', 'custom'] as const;
   const categoryLabels: Record<string, string> = {

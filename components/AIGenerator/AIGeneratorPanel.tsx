@@ -10,7 +10,6 @@ import {
   Play,
   Pause,
   Download,
-  Plus,
   X,
   ChevronDown,
   ChevronUp,
@@ -50,7 +49,6 @@ const AIGeneratorPanel: React.FC = () => {
     referenceAudioUrl,
     error,
     setParams,
-    resetParams,
     applyPreset,
     startGeneration,
     setActiveTab,
@@ -93,9 +91,9 @@ const AIGeneratorPanel: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#1F1F1F] to-[#1A1A1A]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-purple-900/30 to-pink-900/30">
+      <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-amber-900/30 to-orange-900/30">
         <div className="flex items-center gap-2 mb-1">
-          <Wand2 className="text-purple-400" size={20} />
+          <Wand2 className="text-amber-400" size={20} />
           <h2 className="text-lg font-bold text-white">AI Music Generator</h2>
         </div>
         <p className="text-xs text-gray-400">Powered by ACE-Step</p>
@@ -114,7 +112,7 @@ const AIGeneratorPanel: React.FC = () => {
             onClick={() => setActiveTab(id as typeof activeTab)}
             className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors ${
               activeTab === id
-                ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-400/10'
+                ? 'text-amber-400 border-b-2 border-amber-400 bg-amber-400/10'
                 : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
             }`}
           >
@@ -178,7 +176,7 @@ const AIGeneratorPanel: React.FC = () => {
                   setIsPlaying(!isPlaying);
                 }
               }}
-              className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center justify-center"
+              className="w-10 h-10 rounded-full bg-amber-600 hover:bg-amber-700 flex items-center justify-center"
             >
               {isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
             </button>
@@ -250,7 +248,7 @@ const GenerateTab: React.FC<{
           value={currentParams.prompt || ''}
           onChange={(e) => setParams({ prompt: e.target.value })}
           placeholder="E.g., Energetic trap beat with punchy 808s, crispy hi-hats, and dark synth melodies..."
-          className="w-full h-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+          className="w-full h-24 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           disabled={isGenerating}
         />
       </div>
@@ -295,7 +293,7 @@ const GenerateTab: React.FC<{
           type="checkbox"
           checked={currentParams.instrumental || false}
           onChange={(e) => setParams({ instrumental: e.target.checked })}
-          className="w-4 h-4 accent-purple-500"
+          className="w-4 h-4 accent-amber-500"
           disabled={isGenerating}
         />
         <div>
@@ -359,7 +357,7 @@ const GenerateTab: React.FC<{
               max={32}
               value={currentParams.inferSteps || 8}
               onChange={(e) => setParams({ inferSteps: parseInt(e.target.value) })}
-              className="w-full accent-purple-500"
+              className="w-full accent-amber-500"
             />
             <div className="flex justify-between text-[10px] text-gray-500">
               <span>Fast</span>
@@ -372,7 +370,7 @@ const GenerateTab: React.FC<{
             <label className="block text-xs text-gray-400 mb-1">Reference Audio (Style Transfer)</label>
             {referenceAudioUrl ? (
               <div className="flex items-center gap-2 p-2 bg-gray-800 rounded">
-                <Music size={14} className="text-purple-400" />
+                <Music size={14} className="text-amber-400" />
                 <span className="flex-1 text-xs text-gray-300 truncate">{referenceAudioUrl}</span>
                 <button onClick={() => setReferenceAudio(null)} className="text-gray-500 hover:text-red-400">
                   <X size={14} />
@@ -391,14 +389,14 @@ const GenerateTab: React.FC<{
 
       {/* Generation Status */}
       {isGenerating && currentJob && (
-        <div className="p-3 bg-purple-500/20 border border-purple-500/50 rounded-lg">
+        <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <Loader2 size={16} className="text-purple-400 animate-spin" />
-            <span className="text-sm text-purple-300">{currentJob.message || 'Generating...'}</span>
+            <Loader2 size={16} className="text-amber-400 animate-spin" />
+            <span className="text-sm text-amber-300">{currentJob.message || 'Generating...'}</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-purple-500 transition-all duration-300"
+              className="h-full bg-amber-500 transition-all duration-300"
               style={{ width: `${currentJob.progress || 0}%` }}
             />
           </div>
@@ -412,7 +410,7 @@ const GenerateTab: React.FC<{
         className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
           isGenerating || !currentParams.prompt
             ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg'
+            : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg'
         }`}
       >
         {isGenerating ? (
@@ -455,13 +453,13 @@ const HistoryTab: React.FC<{
           onClick={() => setSelectedAudio(audio.id)}
           className={`w-full p-3 rounded-lg text-left transition-all ${
             selectedAudioId === audio.id
-              ? 'bg-purple-600/30 border border-purple-500'
+              ? 'bg-amber-600/30 border border-amber-500'
               : 'bg-gray-800/50 hover:bg-gray-800 border border-transparent'
           }`}
         >
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded bg-purple-600/20 flex items-center justify-center flex-shrink-0">
-              <Music size={18} className="text-purple-400" />
+            <div className="w-10 h-10 rounded bg-amber-600/20 flex items-center justify-center flex-shrink-0">
+              <Music size={18} className="text-amber-400" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">{audio.prompt}</p>
@@ -504,10 +502,10 @@ const PresetsTab: React.FC<{
               applyPreset(preset);
               setActiveTab('generate');
             }}
-            className="p-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg text-left transition-all hover:border-purple-500/50"
+            className="p-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg text-left transition-all hover:border-amber-500/50"
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-purple-400">
+              <span className="text-amber-400">
                 {iconMap[preset.icon] || <Music size={20} />}
               </span>
               <span className="text-sm font-medium text-white">{preset.name}</span>
@@ -517,10 +515,10 @@ const PresetsTab: React.FC<{
         ))}
       </div>
 
-      <div className="mt-4 p-3 bg-gradient-to-r from-purple-900/20 to-pink-900/20 rounded-lg border border-purple-500/20">
+      <div className="mt-4 p-3 bg-gradient-to-r from-amber-900/20 to-orange-900/20 rounded-lg border border-amber-500/20">
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles size={14} className="text-purple-400" />
-          <span className="text-xs font-semibold text-purple-300">Pro Tip</span>
+          <Sparkles size={14} className="text-amber-400" />
+          <span className="text-xs font-semibold text-amber-300">Pro Tip</span>
         </div>
         <p className="text-xs text-gray-400">
           Apply a preset, then customize the prompt and parameters in the Generate tab to create your unique sound.

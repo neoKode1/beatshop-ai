@@ -3,6 +3,28 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import * as Tone from 'tone';
 import { createSynth } from '@/lib/audio/synthesizers';
 import { getMasterEffects } from '@/lib/audio/effects';
+import { getMixer, ToneNodeAdapter } from '@/lib/audio/core/Mixer';
+
+/**
+ * Get the AudioNode for the mixer's default channel.
+ * All pads/tracks route through this instead of directly to MasterEffects.
+ * Signal flow: Source → Mixer Channel → Mixer Master → MasterEffects → Destination
+ *
+ * Lazily initializes the mixer and connects its master to MasterEffects.
+ */
+const getMixerInput = (): AudioNode => {
+  const mixer = getMixer();
+  const channel = mixer.getDefaultChannel();
+
+  // Connect mixer master → MasterEffects (only needs to happen once,
+  // but connectMasterTo handles disconnecting previous destination)
+  const masterEffectsInput = getMasterEffects().getInput();
+  if (masterEffectsInput) {
+    mixer.connectMasterTo(new ToneNodeAdapter(masterEffectsInput as unknown as AudioNode));
+  }
+
+  return channel.getAudioNode();
+};
 
 export type SynthType =
   | 'kick808' | 'kickAcoustic' | 'snare' | 'clap'
@@ -35,6 +57,13 @@ export interface PadEffects {
   // Pitch & Effects
   pitch: number; // semitones
   reverse: boolean;
+
+  // Precomputed Effects (FL Studio Sampler style)
+  normalized?: boolean;
+  dcRemoved?: boolean;
+  polarityFlipped?: boolean;
+  stereoSwapped?: boolean;
+  stereoFaded?: boolean;
 }
 
 export interface Pad {
@@ -122,15 +151,6 @@ export type PatternType = 'drum' | 'piano';
 
 // FL Studio Playback Mode - PAT plays current pattern, SONG plays arrangement
 export type PlaybackMode = 'PAT' | 'SONG';
-
-// Channel Group - For organizing channels in the Channel Rack
-export interface ChannelGroup {
-  id: string;
-  name: string;
-  color: string;
-  collapsed: boolean;
-  channelIds: number[]; // Pad indices belonging to this group
-}
 
 // FL Studio Pattern Colors (16 preset colors)
 export const PATTERN_COLORS = [
@@ -301,7 +321,6 @@ interface BeatStore {
 
   // FL Studio Features
   playbackMode: PlaybackMode; // 'PAT' or 'SONG'
-  channelGroups: ChannelGroup[];
   currentChannelFilter: string | 'all' | 'unsorted'; // Filter channels by group
   globalSwing: number; // Global swing amount (0-100%)
   maxPatterns: number; // Max 999 patterns
@@ -348,6 +367,13 @@ interface BeatStore {
   disarmOnStop: boolean; // Deselect record arm when stopped
   waitForInput: boolean; // Wait for MIDI input before starting recording
 
+  // FL Studio - Typing Keyboard to Piano (Ctrl+T)
+  typingKeyboardEnabled: boolean; // When ON, letter keys play MIDI notes; when OFF, letter keys are shortcuts
+
+  // FL Studio Transport - Remember Seek Time
+  rememberSeekTime: boolean; // After stop, Play resumes from selected position
+  seekPosition: number; // Stored seek position (in seconds)
+
   // Score Logger - 3 minute MIDI buffer (FL Studio feature)
   scoreLogger: {
     enabled: boolean;
@@ -389,6 +415,9 @@ interface BeatStore {
     recordedStepKeys: string[]; // Keys of steps recorded (format: "trackId_stepIndex")
   };
 
+  // Recording Timing Sync (DAW-standard workflow)
+  recordingDownbeatTime: number; // Scheduled audio time when recording starts (downbeat) - for MIDI timestamp sync
+
   // MIDI Learn Mode
   midiLearnMode: boolean; // Whether MIDI Learn mode is active
   midiLearnTarget: { type: string; id: string | number; label: string } | null; // Current control being mapped
@@ -407,8 +436,15 @@ interface BeatStore {
   setIsPlaying: (playing: boolean) => void;
   setIsArmed: (armed: boolean) => void;
   setIsRecording: (recording: boolean) => void;
-  togglePlayback: () => void; // Toggle play/pause state
+  setRecordingDownbeatTime: (time: number) => void;
+  togglePlayback: () => void; // FL Studio: Space = Play/Stop+Rewind
+  pausePlayback: () => void; // FL Studio: Ctrl+Space = Pause (keep position)
+  stopPlayback: () => void; // Full stop - reset position to 0 (or seekPosition)
   toggleRecording: () => void; // Toggle recording armed state
+  setRememberSeekTime: (enabled: boolean) => void;
+  setSeekPosition: (position: number) => void;
+  setTypingKeyboardEnabled: (enabled: boolean) => void;
+  toggleTypingKeyboardEnabled: () => void;
   setIsCountingIn: (countingIn: boolean) => void;
   setCountInStep: (step: number) => void;
   setCountInEnabled: (enabled: boolean) => void;
@@ -506,6 +542,7 @@ interface BeatStore {
 
   // Pad actions (legacy - for backward compatibility)
   assignSampleToPad: (padIndex: number, sample: Sample) => void;
+  clearPadSample: (padIndex: number) => void;
   triggerPad: (padIndex: number, velocity?: number, scheduledTime?: number) => void | Promise<void>;
   setPadVolume: (padIndex: number, volume: number) => void;
   setPadPan: (padIndex: number, pan: number) => void;
@@ -614,17 +651,6 @@ interface BeatStore {
   setPlaybackMode: (mode: PlaybackMode) => void;
   togglePlaybackMode: () => void;
 
-  // Channel Group actions
-  createChannelGroup: (name: string, color?: string) => string; // Returns group ID
-  deleteChannelGroup: (groupId: string) => void;
-  renameChannelGroup: (groupId: string, newName: string) => void;
-  setChannelGroupColor: (groupId: string, color: string) => void;
-  assignChannelToGroup: (padIndex: number, groupId: string) => void;
-  removeChannelFromGroup: (padIndex: number, groupId: string) => void;
-  setChannelFilter: (filter: string | 'all' | 'unsorted') => void;
-  toggleChannelGroupCollapsed: (groupId: string) => void;
-  getFilteredChannels: () => number[]; // Returns pad indices matching current filter
-
   // Global swing and groove templates
   setGlobalSwing: (swing: number) => void;
   currentGrooveTemplate: string | null; // ID of currently applied groove template
@@ -651,6 +677,9 @@ interface BeatStore {
     midiNotes?: MidiNote[];
     masterSettings?: any;
   }) => void;
+
+  // Reset to defaults - clears localStorage and resets all state
+  resetToDefaults: () => void;
 
   // MPC Studio Button Actions
   setNoteRepeatEnabled: (enabled: boolean) => void;
@@ -700,7 +729,6 @@ interface BeatStore {
   copyPattern: () => void;
   copyPatternToClipboard: () => void; // Copy current pattern data to clipboard
   pastePatternFromClipboard: () => void; // Paste clipboard data to current pattern
-  deleteSelectedNotes: () => void;
 
   // Get effective velocity based on level modes
   getEffectiveVelocity: (padIndex: number, inputVelocity?: number) => number;
@@ -821,6 +849,7 @@ interface SerializablePad {
   muted: boolean;
   solo: boolean;
   note?: string;
+  effects?: PadEffects;
 }
 
 // Convert pads to serializable format
@@ -833,7 +862,32 @@ const serializePads = (pads: Pad[]): SerializablePad[] => {
     muted: pad.muted,
     solo: pad.solo,
     note: pad.note,
+    effects: pad.effects,
   }));
+};
+
+// Helper: Convert pad index to MIDI pitch (same mapping as PadGrid)
+// Standard GM drum mapping for 4x4 grid
+const padToMidiPitch = (padIndex: number): number => {
+  const drumPitches = [
+    36, 38, 42, 46,  // C2, D2, F#2, A#2 (Kick, Snare, HH Closed, HH Open)
+    39, 37, 41, 43,  // D#2, C#2, F2, G2 (Clap, Rim, Tom Low, Tom Mid)
+    45, 49, 51, 56,  // A2, C#3, D#3, G#3 (Tom Hi, Crash, Ride, Cowbell)
+    54, 69, 70, 75,  // F#3, A4, A#4, D#5 (Tambourine, Cabasa, Maracas, Claves)
+  ];
+  return drumPitches[padIndex] ?? (36 + padIndex);
+};
+
+// Default pad effects for rehydration
+const DEFAULT_PAD_EFFECTS: PadEffects = {
+  attack: 0.01,
+  decay: 0.1,
+  sustain: 0.5,
+  release: 0.3,
+  filterFreq: 5000,
+  filterQ: 1,
+  pitch: 0,
+  reverse: false,
 };
 
 // Rehydrate pads with Tone.js objects
@@ -849,7 +903,7 @@ const rehydratePads = (serializedPads: SerializablePad[]): Pad[] => {
       } else if (pad.sample.type === 'audio' && pad.sample.url) {
         // Only rehydrate non-blob URLs (built-in samples)
         if (!pad.sample.url.startsWith('blob:')) {
-          player = new Tone.Player(pad.sample.url).connect(getMasterEffects().getInput());
+          player = new Tone.Player(pad.sample.url).connect(getMixerInput());
           player.volume.value = Tone.gainToDb(pad.volume);
         }
       }
@@ -859,6 +913,9 @@ const rehydratePads = (serializedPads: SerializablePad[]): Pad[] => {
       ...pad,
       synth,
       player,
+      effects: pad.effects || DEFAULT_PAD_EFFECTS,
+      envelope: null,
+      filter: null,
     };
   });
 };
@@ -896,10 +953,10 @@ export const useBeatStore = create<BeatStore>()(
   pads: createInitialPads(),
   padMode: 'drum',
   selectedPadIndex: null,
-  steps: createInitialSteps(16, 16),
-  numSteps: 16, // 1 bar * 16 steps per bar (4/4 time)
-  numBars: 1, // Default to 1 bar
-  patternLength: 16, // Legacy - kept for compatibility
+  steps: createInitialSteps(16, 64),
+  numSteps: 64, // 4 bars * 16 steps per bar (4/4 time) = 16 beats
+  numBars: 4, // Default to 4 bars (16 beats in 4/4)
+  patternLength: 64, // Legacy - kept for compatibility
   swing: 0,
   timeSignature: '4/4',
   snapSetting: 'step', // FL Studio default snap
@@ -952,7 +1009,6 @@ export const useBeatStore = create<BeatStore>()(
 
   // FL Studio Features
   playbackMode: 'PAT' as PlaybackMode,
-  channelGroups: [],
   currentChannelFilter: 'all',
   globalSwing: 0,
   currentGrooveTemplate: null,
@@ -990,16 +1046,20 @@ export const useBeatStore = create<BeatStore>()(
   currentMode: 'main' as const,
 
   // FL Studio Recording Mode Settings
-  loopRecordingEnabled: true, // Default ON: recording loops at pattern end (FL Studio default)
+  loopRecordingEnabled: false, // Default OFF: recording continues beyond pattern end
   blendRecording: true, // Default ON: new notes blend with existing (overdub mode)
   recordingFilter: {
     notes: true, // Record MIDI notes
     automation: true, // Record automation
     audio: true, // Record audio
   },
-  recordingStartsPlayback: true, // Pressing record also starts playback
+  recordingStartsPlayback: false, // FL Studio default: OFF — pressing record only arms, doesn't start playback
   disarmOnStop: false, // Don't deselect record arm when stopped
   waitForInput: false, // Wait for MIDI input before starting recording
+
+  // FL Studio Transport - Remember Seek Time
+  rememberSeekTime: false, // Default OFF - Play always starts from beginning
+  seekPosition: 0, // Stored seek position (seconds)
 
   // Score Logger - 3 minute MIDI buffer
   scoreLogger: {
@@ -1031,6 +1091,12 @@ export const useBeatStore = create<BeatStore>()(
     recordedStepKeys: [],
   },
 
+  // Recording Timing Sync
+  recordingDownbeatTime: 0,
+
+  // FL Studio - Typing Keyboard to Piano (Ctrl+T)
+  typingKeyboardEnabled: false, // Default OFF - letter keys are shortcuts
+
   // MIDI Learn Mode
   midiLearnMode: false,
   midiLearnTarget: null,
@@ -1051,29 +1117,143 @@ export const useBeatStore = create<BeatStore>()(
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setIsArmed: (armed) => set({ isArmed: armed }),
   setIsRecording: (recording) => set({ isRecording: recording }),
+  setRecordingDownbeatTime: (time) => set({ recordingDownbeatTime: time }),
 
-  // Toggle playback state
-  togglePlayback: () => {
+  // FL Studio: Space = Play/Stop+Rewind (not Play/Pause)
+  // When playing: stops and rewinds to 0 (or seekPosition if rememberSeekTime)
+  // When stopped: starts from 0 (or seekPosition if rememberSeekTime)
+  togglePlayback: async () => {
     const state = get();
+
+    // Ensure AudioContext is fully running before any transport operations.
+    await Tone.start();
+    if (Tone.getContext().state !== 'running') {
+      await Tone.getContext().resume();
+    }
+    // Double-check: wait for context to actually be running (handles slow init)
+    if (Tone.getContext().state !== 'running') {
+      console.warn('⚠️ [Store] AudioContext still not running after resume, retrying...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Tone.getContext().resume();
+    }
+
     if (state.isPlaying) {
-      set({ isPlaying: false });
+      // FL Studio: Space while playing = STOP + rewind (not pause)
+      Tone.getTransport().stop();
+      Tone.getTransport().cancel(); // Cancel pending scheduled events
+      const resetPos = state.rememberSeekTime ? state.seekPosition : 0;
+      Tone.getTransport().seconds = resetPos;
+      const updates: Partial<BeatStore> = {
+        isPlaying: false,
+        isRecording: false,
+        isCountingIn: false,
+        countInStep: 0,
+        currentStep: 0,
+      };
+      // FL Studio: disarmOnStop option
+      if (state.disarmOnStop) {
+        updates.isArmed = false;
+      }
+      set(updates);
+      // Ensure cursor reset sticks after any pending Tone.Draw callbacks
+      requestAnimationFrame(() => set({ currentStep: 0 }));
+      console.log('⏹️ [Store] Playback stopped + rewind (FL Studio Space behavior)');
     } else {
+      // Start playback from beginning (or seekPosition)
+      const startPos = state.rememberSeekTime ? state.seekPosition : 0;
+      Tone.getTransport().seconds = startPos;
+      set({ currentStep: 0 });
+
       // If armed for recording, start recording when play starts
       if (state.isArmed) {
-        set({ isPlaying: true, isRecording: true });
+        if (state.countInEnabled) {
+          set({ isPlaying: true, isRecording: true, isCountingIn: true, countInStep: 0 });
+          console.log('🔴 [Store] Recording started with count-in');
+        } else {
+          set({ isPlaying: true, isRecording: true });
+          console.log('🔴 [Store] Recording started (no count-in)');
+        }
       } else {
         set({ isPlaying: true });
+        console.log('▶️ [Store] Playback started');
       }
+      Tone.getTransport().start();
     }
   },
 
-  // Toggle recording armed state
+  // FL Studio: Ctrl+Space = Pause (keep current position)
+  pausePlayback: () => {
+    const state = get();
+    if (state.isPlaying) {
+      Tone.getTransport().pause();
+      set({ isPlaying: false });
+      console.log('⏸️ [Store] Playback PAUSED (position kept)');
+    }
+  },
+
+  // Full stop - stops transport and resets position (FL Studio Stop button)
+  stopPlayback: () => {
+    const state = get();
+    Tone.getTransport().stop();
+    Tone.getTransport().cancel(); // Cancel any pending scheduled events
+    const resetPos = state.rememberSeekTime ? state.seekPosition : 0;
+    Tone.getTransport().seconds = resetPos;
+    const updates: Partial<BeatStore> = {
+      isPlaying: false,
+      isRecording: false,
+      isCountingIn: false,
+      countInStep: 0,
+      currentStep: 0,
+    };
+    // FL Studio: disarmOnStop option
+    if (state.disarmOnStop) {
+      updates.isArmed = false;
+    }
+    set(updates);
+    // Ensure cursor reset sticks after any pending Tone.Draw callbacks
+    requestAnimationFrame(() => set({ currentStep: 0 }));
+    console.log('⏹️ [Store] Playback stopped and reset');
+  },
+
+  // Remember Seek Time actions
+  setRememberSeekTime: (enabled) => set({ rememberSeekTime: enabled }),
+  setSeekPosition: (position) => set({ seekPosition: position }),
+
+  // Typing Keyboard to Piano (Ctrl+T) actions
+  setTypingKeyboardEnabled: (enabled) => set({ typingKeyboardEnabled: enabled }),
+  toggleTypingKeyboardEnabled: () => set((state) => ({ typingKeyboardEnabled: !state.typingKeyboardEnabled })),
+
+  // Toggle recording armed state — ONLY arms/disarms, never starts playback
   toggleRecording: () => {
     const state = get();
     if (state.isArmed || state.isRecording) {
-      set({ isArmed: false, isRecording: false, isCountingIn: false, countInStep: 0 });
+      // Disarm recording — if actively recording, stop transport too
+      if (state.isRecording) {
+        Tone.getTransport().stop();
+        Tone.getTransport().position = 0;
+        set({
+          isArmed: false,
+          isRecording: false,
+          isCountingIn: false,
+          countInStep: 0,
+          isPlaying: false,
+          currentStep: 0
+        });
+        console.log('⏹️ [Store] Recording stopped and reset');
+      } else {
+        // Just disarm (wasn't actively recording yet)
+        set({
+          isArmed: false,
+          isCountingIn: false,
+          countInStep: 0,
+        });
+        console.log('🔴 [Store] Recording DISARMED');
+      }
     } else {
+      // ARM recording — does NOT start playback (FL Studio default behavior)
+      // Playback starts when user presses Play/Space while armed
       set({ isArmed: true });
+      console.log('🎙️ [Store] Recording armed — press Play to start recording');
     }
   },
 
@@ -1087,12 +1267,22 @@ export const useBeatStore = create<BeatStore>()(
   setNumBars: (bars) => {
     const timeSignature = get().timeSignature;
     const newNumSteps = calculateStepsFromBars(bars, timeSignature);
+    const currentMidiNotes = get().midiNotes;
+
+    // Filter out midiNotes that are beyond the new numSteps
+    // This prevents stale notes from appearing "at the end" of the pattern
+    const filteredMidiNotes = currentMidiNotes.filter(note => note.startTime < newNumSteps);
+
+    if (filteredMidiNotes.length < currentMidiNotes.length) {
+      console.log(`🗑️ [setNumBars] Removed ${currentMidiNotes.length - filteredMidiNotes.length} notes beyond step ${newNumSteps}`);
+    }
 
     set({
       numBars: bars,
       numSteps: newNumSteps,
       patternLength: newNumSteps as 16 | 32 | 64, // Legacy compatibility
-      steps: createInitialSteps(16, newNumSteps)
+      steps: createInitialSteps(16, newNumSteps),
+      midiNotes: filteredMidiNotes, // Clean up out-of-range notes
     });
   },
 
@@ -1353,16 +1543,35 @@ export const useBeatStore = create<BeatStore>()(
       sampleId: noteData.sampleId,
     };
 
-    // Add to midiNotes
-    set((s) => ({
-      midiNotes: [...s.midiNotes, note],
-      recordingSession: {
-        ...s.recordingSession,
-        recordedNoteIds: [...s.recordingSession.recordedNoteIds, noteId],
-      }
-    }));
+    // Add to global midiNotes AND sync to the appropriate instrument track
+    // (same dual-write pattern as addMidiNote — scheduler reads track.midiNotes)
+    const targetTrackId = state.selectedTrackId;
+    const tracks = [...state.tracks];
+    const targetTrack = targetTrackId
+      ? tracks.find(t => t.id === targetTrackId && t.type === 'instrument')
+      : tracks.find(t => t.type === 'instrument');
 
-    console.log('🎵 Recorded note with quantize:', note);
+    if (targetTrack) {
+      targetTrack.midiNotes.push({ ...note });
+      console.log(`🎹 [recordNoteWithQuantize] Synced to track "${targetTrack.name}"`);
+    }
+
+    set({
+      midiNotes: [...state.midiNotes, note],
+      tracks,
+      recordingSession: {
+        ...state.recordingSession,
+        recordedNoteIds: [...state.recordingSession.recordedNoteIds, noteId],
+      }
+    });
+
+    console.log('🎵 Recorded note with quantize:', {
+      note,
+      numSteps: state.numSteps,
+      numBars: state.numBars,
+      totalMidiNotes: state.midiNotes.length + 1,
+      syncedToTrack: targetTrack?.name ?? 'NONE',
+    });
   },
 
   recordStepWithQuantize: (trackId, stepIndex, velocity = 0.8) => {
@@ -1560,14 +1769,14 @@ export const useBeatStore = create<BeatStore>()(
     if (sample) {
       if (type === 'drum' && sample.type === 'audio' && sample.url) {
         // Drum track: one-shot player
-        player = new Tone.Player(sample.url).connect(getMasterEffects().getInput());
+        player = new Tone.Player(sample.url).connect(getMixerInput());
         player.volume.value = Tone.gainToDb(0.8);
       } else if (type === 'instrument' && sample.type === 'audio' && sample.url) {
         // Instrument track: chromatic sampler
         sampler = new Tone.Sampler({
           urls: { 'C2': sample.url },
           baseUrl: '',
-        }).connect(getMasterEffects().getInput());
+        }).connect(getMixerInput());
         sampler.volume.value = Tone.gainToDb(0.8);
       } else if (sample.type === 'synth' && sample.synthType) {
         synth = createSynth(sample.synthType);
@@ -1579,7 +1788,7 @@ export const useBeatStore = create<BeatStore>()(
       id: trackId,
       name: sample?.name || `${type === 'drum' ? 'Drum' : 'Instrument'} Track ${get().tracks.length + 1}`,
       type,
-      sample,
+      sample: sample || null,
       volume: 0.8,
       pan: 0,
       muted: false,
@@ -1656,13 +1865,13 @@ export const useBeatStore = create<BeatStore>()(
     let synth = null;
 
     if (track.type === 'drum' && sample.type === 'audio' && sample.url) {
-      player = new Tone.Player(sample.url).connect(getMasterEffects().getInput());
+      player = new Tone.Player(sample.url).connect(getMixerInput());
       player.volume.value = Tone.gainToDb(track.volume);
     } else if (track.type === 'instrument' && sample.type === 'audio' && sample.url) {
       sampler = new Tone.Sampler({
         urls: { 'C2': sample.url },
         baseUrl: '',
-      }).connect(getMasterEffects().getInput());
+      }).connect(getMixerInput());
       sampler.volume.value = Tone.gainToDb(track.volume);
     } else if (sample.type === 'synth' && sample.synthType) {
       synth = createSynth(sample.synthType);
@@ -1683,9 +1892,14 @@ export const useBeatStore = create<BeatStore>()(
 
   triggerTrack: (trackId, pitch, velocity = 0.8, scheduledTime) => {
     const track = get().tracks.find(t => t.id === trackId);
-    if (!track || track.muted) return;
+    if (!track || track.muted) {
+      if (scheduledTime) console.log(`🔇 [triggerTrack] Skipped — track ${trackId?.slice(-8)} ${!track ? 'NOT FOUND' : 'MUTED'}`);
+      return;
+    }
 
-    const time = scheduledTime || Tone.now();
+    // Clamp to Tone.now() to prevent "time must be >= last scheduled time" errors
+    const now = Tone.now();
+    const time = scheduledTime ? Math.max(scheduledTime, now) : now;
 
     if (track.type === 'drum' && track.player && track.player.loaded) {
       // Drum track: trigger one-shot
@@ -1702,6 +1916,9 @@ export const useBeatStore = create<BeatStore>()(
       } else {
         track.synth.triggerAttackRelease('16n', time, velocity);
       }
+    } else if (scheduledTime) {
+      // Only log for scheduled playback (not live demo) to avoid flooding console
+      console.warn(`⚠️ [triggerTrack] NO AUDIO ENGINE for track "${track.name}" — player=${!!track.player}, loaded=${track.player?.loaded}, sampler=${!!track.sampler}, synth=${!!track.synth}`);
     }
   },
 
@@ -1749,12 +1966,22 @@ export const useBeatStore = create<BeatStore>()(
   addStepToTrack: (trackId, stepIndex, velocity = 0.8) => {
     const tracks = [...get().tracks];
     const track = tracks.find(t => t.id === trackId);
-    if (!track || track.type !== 'drum') return;
+    if (!track || track.type !== 'drum') {
+      console.warn(`⚠️ [addStepToTrack] SKIPPED — track not found or not drum type`, {
+        trackId: trackId?.slice(-8),
+        trackFound: !!track,
+        trackType: track?.type,
+      });
+      return;
+    }
 
     const stepIdx = track.steps.findIndex(s => s.stepIndex === stepIndex);
     if (stepIdx !== -1) {
       track.steps[stepIdx].active = true;
       track.steps[stepIdx].velocity = velocity;
+      console.log(`✅ [addStepToTrack] Activated step ${stepIndex} on track "${track.name}" (vel=${velocity.toFixed(2)}, totalSteps=${track.steps.length})`);
+    } else {
+      console.warn(`⚠️ [addStepToTrack] Step ${stepIndex} NOT FOUND in track "${track.name}" (track has ${track.steps.length} steps, range 0-${track.steps.length - 1})`);
     }
 
     set({ tracks });
@@ -1980,7 +2207,7 @@ export const useBeatStore = create<BeatStore>()(
           synth.volume.value = Tone.gainToDb(pad.volume);
         } else if (sample.type === 'audio' && sample.url) {
           // Create audio player for each pad
-          player = new Tone.Player(sample.url).connect(getMasterEffects().getInput());
+          player = new Tone.Player(sample.url).connect(getMixerInput());
           player.volume.value = Tone.gainToDb(pad.volume);
           // Set playback rate for pitch shifting (pad 0 = normal, others shifted)
           player.playbackRate = getPitchRatio(index);
@@ -2015,7 +2242,7 @@ export const useBeatStore = create<BeatStore>()(
         synth.volume.value = Tone.gainToDb(pad.volume);
       } else if (sample.type === 'audio' && sample.url) {
         // Create audio player
-        player = new Tone.Player(sample.url).connect(getMasterEffects().getInput());
+        player = new Tone.Player(sample.url).connect(getMixerInput());
         player.volume.value = Tone.gainToDb(pad.volume);
       }
 
@@ -2030,7 +2257,42 @@ export const useBeatStore = create<BeatStore>()(
 
     set({ pads });
   },
-  
+
+  clearPadSample: (padIndex) => {
+    const pads = [...get().pads];
+    const pad = pads[padIndex];
+
+    // Dispose synth and player
+    if (pad.synth) {
+      try { pad.synth.dispose(); } catch {}
+    }
+    if (pad.player) {
+      try { pad.player.dispose(); } catch {}
+    }
+
+    // Reset pad to empty state
+    pads[padIndex] = {
+      ...pad,
+      sample: null,
+      synth: null,
+      player: null,
+      note: 'C2',
+      effects: {
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.5,
+        release: 0.3,
+        filterFreq: 5000,
+        filterQ: 1,
+        pitch: 0,
+        reverse: false,
+      }
+    };
+
+    console.log(`🗑️ [clearPadSample] Cleared sample from Pad ${padIndex + 1}`);
+    set({ pads });
+  },
+
   triggerPad: async (padIndex, velocity = 0.8, scheduledTime?: number) => {
     const pads = get().pads;
     const pad = pads[padIndex];
@@ -2048,9 +2310,11 @@ export const useBeatStore = create<BeatStore>()(
       await Tone.start();
     }
 
-    // Use scheduled time if provided (from sequencer), otherwise use current time
-    // This ensures precise timing when triggered from the transport
-    const time = scheduledTime !== undefined ? scheduledTime : Tone.now();
+    // Use scheduled time if provided (from sequencer), otherwise use current time.
+    // Clamp to Tone.now() to prevent "time must be >= last scheduled time" errors
+    // when the scheduler's pre-scheduled time has already passed by execution time.
+    const now = Tone.now();
+    const time = scheduledTime !== undefined ? Math.max(scheduledTime, now) : now;
     const vel = velocity;
 
     // Trigger synthesizer
@@ -2103,6 +2367,48 @@ export const useBeatStore = create<BeatStore>()(
   },
 
   setPadMode: (mode) => {
+    const { pads, selectedPadIndex } = get();
+
+    // When switching TO chromatic mode, distribute the selected pad's sample to all pads
+    if (mode === 'chromatic' && selectedPadIndex !== null) {
+      const selectedPad = pads[selectedPadIndex];
+
+      if (selectedPad && selectedPad.sample) {
+        console.log(`🎹 [setPadMode] Switching to chromatic mode - distributing "${selectedPad.sample.name}" to all pads`);
+
+        const newPads = pads.map((pad, index) => {
+          // Calculate semitone offset from the base pad (selected pad is the "root" note)
+          const semitoneOffset = index - selectedPadIndex;
+          const pitchRatio = getPitchRatio(semitoneOffset);
+
+          // Clone the sample with pitch adjustment
+          const newPlayer = selectedPad.player ? new Tone.Player({
+            url: selectedPad.sample!.url,
+            onload: () => {
+              console.log(`🎹 Chromatic pad ${index + 1} loaded (${semitoneOffset > 0 ? '+' : ''}${semitoneOffset} semitones)`);
+            }
+          }).connect(getMixerInput()) : null;
+
+          if (newPlayer) {
+            newPlayer.playbackRate = pitchRatio;
+          }
+
+          return {
+            ...pad,
+            sample: selectedPad.sample,
+            player: newPlayer,
+            effects: {
+              ...pad.effects,
+              pitch: semitoneOffset,
+            }
+          };
+        });
+
+        set({ padMode: mode, pads: newPads });
+        return;
+      }
+    }
+
     set({ padMode: mode });
   },
 
@@ -2134,12 +2440,37 @@ export const useBeatStore = create<BeatStore>()(
 
   toggleStep: (padIndex, stepIndex) => {
     const steps = [...get().steps];
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
+
     const stepIdx = steps.findIndex(
       s => s.padIndex === padIndex && s.stepIndex === stepIndex
     );
     if (stepIdx !== -1) {
-      steps[stepIdx].active = !steps[stepIdx].active;
-      set({ steps });
+      const wasActive = steps[stepIdx].active;
+      steps[stepIdx].active = !wasActive;
+
+      // Also sync with piano roll
+      if (!wasActive) {
+        // Step is now active - add note to piano roll
+        midiNotes.push({
+          id: `note-${Date.now()}-${Math.random()}`,
+          pitch: midiPitch,
+          startTime: stepIndex,
+          duration: 1,
+          velocity: steps[stepIdx].velocity || 0.8,
+        });
+      } else {
+        // Step is now inactive - remove note from piano roll
+        const noteIdx = midiNotes.findIndex(
+          n => n.pitch === midiPitch && n.startTime === stepIndex
+        );
+        if (noteIdx !== -1) {
+          midiNotes.splice(noteIdx, 1);
+        }
+      }
+
+      set({ steps, midiNotes });
     }
   },
   
@@ -2182,7 +2513,22 @@ export const useBeatStore = create<BeatStore>()(
 
   clearPattern: () => {
     const { patternLength } = get();
-    set({ steps: createInitialSteps(16, patternLength) });
+    // Clear BOTH steps AND midiNotes (FL Studio behavior - clears the entire pattern)
+    // Also clear per-track midiNotes so playback scheduler doesn't trigger ghost notes
+    set((state) => {
+      const tracks = state.tracks.map(track => {
+        if (track.type !== 'instrument') return track;
+        if (track.midiNotes.length === 0) return track;
+        return { ...track, midiNotes: [] };
+      });
+      return {
+        steps: createInitialSteps(16, patternLength),
+        midiNotes: [],
+        currentStep: 0, // Reset cursor to beginning
+        tracks,
+      };
+    });
+    console.log('🗑️ Pattern cleared (steps + MIDI notes + track MIDI notes)');
   },
 
   // Fill Steps & Rotate Steps (FL Studio style)
@@ -2190,6 +2536,11 @@ export const useBeatStore = create<BeatStore>()(
     get().pushUndoState();
     const steps = [...get().steps];
     const numSteps = get().numSteps;
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
+
+    // First, remove existing notes for this pad's pitch
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
 
     for (let i = 0; i < numSteps; i++) {
       const stepIdx = steps.findIndex(
@@ -2197,19 +2548,33 @@ export const useBeatStore = create<BeatStore>()(
       );
       if (stepIdx !== -1) {
         // Fill every Nth step starting from offset
-        steps[stepIdx].active = (i - offset) % interval === 0 && i >= offset;
-        if (steps[stepIdx].active) {
+        const shouldBeActive = (i - offset) % interval === 0 && i >= offset;
+        steps[stepIdx].active = shouldBeActive;
+        if (shouldBeActive) {
           steps[stepIdx].velocity = 0.8;
+          // Also add to piano roll
+          filteredNotes.push({
+            id: `note-${Date.now()}-${Math.random()}-${i}`,
+            pitch: midiPitch,
+            startTime: i,
+            duration: 1,
+            velocity: 0.8,
+          });
         }
       }
     }
-    set({ steps });
+    set({ steps, midiNotes: filteredNotes });
   },
 
   fillAllSteps: (padIndex) => {
     get().pushUndoState();
     const steps = [...get().steps];
     const numSteps = get().numSteps;
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
+
+    // First, remove existing notes for this pad's pitch
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
 
     for (let i = 0; i < numSteps; i++) {
       const stepIdx = steps.findIndex(
@@ -2218,27 +2583,44 @@ export const useBeatStore = create<BeatStore>()(
       if (stepIdx !== -1) {
         steps[stepIdx].active = true;
         steps[stepIdx].velocity = 0.8;
+        // Also add to piano roll
+        filteredNotes.push({
+          id: `note-${Date.now()}-${Math.random()}-${i}`,
+          pitch: midiPitch,
+          startTime: i,
+          duration: 1,
+          velocity: 0.8,
+        });
       }
     }
-    set({ steps });
+    set({ steps, midiNotes: filteredNotes });
   },
 
   clearPadSteps: (padIndex) => {
     get().pushUndoState();
     const steps = [...get().steps];
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
 
+    // Clear step sequencer
     steps.forEach((step, idx) => {
       if (step.padIndex === padIndex) {
         steps[idx].active = false;
       }
     });
-    set({ steps });
+
+    // Also remove from piano roll
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
+
+    set({ steps, midiNotes: filteredNotes });
   },
 
   rotateSteps: (padIndex, amount) => {
     get().pushUndoState();
     const steps = [...get().steps];
     const numSteps = get().numSteps;
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
 
     // Get current pad's step states
     const padSteps = steps
@@ -2268,7 +2650,21 @@ export const useBeatStore = create<BeatStore>()(
       }
     });
 
-    set({ steps });
+    // Also update piano roll - remove old notes for this pitch and add rotated ones
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
+    rotatedStates.forEach((state, i) => {
+      if (state.active) {
+        filteredNotes.push({
+          id: `note-${Date.now()}-${Math.random()}-${i}`,
+          pitch: midiPitch,
+          startTime: i,
+          duration: 1,
+          velocity: state.velocity,
+        });
+      }
+    });
+
+    set({ steps, midiNotes: filteredNotes });
   },
 
   rotateAllSteps: (amount) => {
@@ -2312,6 +2708,8 @@ export const useBeatStore = create<BeatStore>()(
     get().pushUndoState();
     const steps = [...get().steps];
     const numSteps = get().numSteps;
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
 
     const padSteps = steps
       .filter(s => s.padIndex === padIndex)
@@ -2330,56 +2728,134 @@ export const useBeatStore = create<BeatStore>()(
       }
     });
 
-    set({ steps });
+    // Also update piano roll - remove old notes for this pitch and add reversed ones
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
+    reversedStates.forEach((state, i) => {
+      if (state.active) {
+        filteredNotes.push({
+          id: `note-${Date.now()}-${Math.random()}-${i}`,
+          pitch: midiPitch,
+          startTime: i,
+          duration: 1,
+          velocity: state.velocity,
+        });
+      }
+    });
+
+    set({ steps, midiNotes: filteredNotes });
   },
 
   randomizeSteps: (padIndex, density = 0.5) => {
     get().pushUndoState();
     const steps = [...get().steps];
     const numSteps = get().numSteps;
+    const midiPitch = padToMidiPitch(padIndex);
+    const midiNotes = [...get().midiNotes];
+
+    // Remove existing notes for this pitch
+    const filteredNotes = midiNotes.filter(n => n.pitch !== midiPitch);
 
     for (let i = 0; i < numSteps; i++) {
       const stepIdx = steps.findIndex(
         s => s.padIndex === padIndex && s.stepIndex === i
       );
       if (stepIdx !== -1) {
-        steps[stepIdx].active = Math.random() < density;
-        if (steps[stepIdx].active) {
+        const isActive = Math.random() < density;
+        steps[stepIdx].active = isActive;
+        if (isActive) {
           // Random velocity between 0.5 and 1.0
-          steps[stepIdx].velocity = 0.5 + Math.random() * 0.5;
+          const velocity = 0.5 + Math.random() * 0.5;
+          steps[stepIdx].velocity = velocity;
+          // Also add to piano roll
+          filteredNotes.push({
+            id: `note-${Date.now()}-${Math.random()}-${i}`,
+            pitch: midiPitch,
+            startTime: i,
+            duration: 1,
+            velocity: velocity,
+          });
         }
       }
     }
-    set({ steps });
+    set({ steps, midiNotes: filteredNotes });
   },
 
   // Piano Roll actions
+  // NOTE: All MIDI note functions sync BOTH the global midiNotes[] (used by piano roll UI)
+  // AND the per-track track.midiNotes[] (used by the scheduler for playback).
+  // Without this dual-write, notes drawn in the piano roll or recorded via keyboard
+  // would appear visually but never play back.
+
   addMidiNote: (note) => {
     const newNote: MidiNote = {
       ...note,
       id: `note-${Date.now()}-${Math.random()}`,
     };
-    set((state) => ({
+    const state = get();
+    // Find the target instrument track: selectedTrackId first, then first instrument track
+    const targetTrackId = state.selectedTrackId;
+    const tracks = [...state.tracks];
+    const targetTrack = targetTrackId
+      ? tracks.find(t => t.id === targetTrackId && t.type === 'instrument')
+      : tracks.find(t => t.type === 'instrument');
+
+    if (targetTrack) {
+      targetTrack.midiNotes.push({ ...newNote });
+      console.log(`🎹 [addMidiNote] Synced to track "${targetTrack.name}" (${targetTrack.midiNotes.length} notes)`);
+    } else {
+      console.warn('⚠️ [addMidiNote] No instrument track found — note added to global array only (won\'t play)');
+    }
+
+    set({
       midiNotes: [...state.midiNotes, newNote],
-    }));
+      tracks,
+    });
   },
 
   updateMidiNote: (id, updates) => {
-    set((state) => ({
-      midiNotes: state.midiNotes.map((note) =>
+    set((state) => {
+      // Update in global midiNotes
+      const midiNotes = state.midiNotes.map((note) =>
         note.id === id ? { ...note, ...updates } : note
-      ),
-    }));
+      );
+      // Also update in all tracks' midiNotes (note could be on any track)
+      const tracks = state.tracks.map(track => {
+        if (track.type !== 'instrument') return track;
+        const noteIdx = track.midiNotes.findIndex(n => n.id === id);
+        if (noteIdx === -1) return track;
+        const updatedNotes = [...track.midiNotes];
+        updatedNotes[noteIdx] = { ...updatedNotes[noteIdx], ...updates };
+        return { ...track, midiNotes: updatedNotes };
+      });
+      return { midiNotes, tracks };
+    });
   },
 
   deleteMidiNote: (id) => {
-    set((state) => ({
-      midiNotes: state.midiNotes.filter((note) => note.id !== id),
-    }));
+    set((state) => {
+      // Delete from global midiNotes
+      const midiNotes = state.midiNotes.filter((note) => note.id !== id);
+      // Also delete from all tracks' midiNotes
+      const tracks = state.tracks.map(track => {
+        if (track.type !== 'instrument') return track;
+        const filtered = track.midiNotes.filter(n => n.id !== id);
+        if (filtered.length === track.midiNotes.length) return track; // No change
+        return { ...track, midiNotes: filtered };
+      });
+      return { midiNotes, tracks };
+    });
   },
 
   clearMidiNotes: () => {
-    set({ midiNotes: [] });
+    set((state) => {
+      // Clear all instrument tracks' midiNotes too
+      const tracks = state.tracks.map(track => {
+        if (track.type !== 'instrument') return track;
+        if (track.midiNotes.length === 0) return track;
+        return { ...track, midiNotes: [] };
+      });
+      return { midiNotes: [], tracks };
+    });
   },
 
   // Piano Roll Tool & Selection actions
@@ -2497,12 +2973,23 @@ export const useBeatStore = create<BeatStore>()(
     }
     get().pushUndoState();
     const deleteCount = state.selectedNoteIds.length;
-    set((s) => ({
-      midiNotes: s.midiNotes.filter(
+    set((s) => {
+      const midiNotes = s.midiNotes.filter(
         (n) => !s.selectedNoteIds.includes(n.id)
-      ),
-      selectedNoteIds: [],
-    }));
+      );
+      // Also delete from all tracks' midiNotes so playback scheduler stays in sync
+      const tracks = s.tracks.map(track => {
+        if (track.type !== 'instrument') return track;
+        const filtered = track.midiNotes.filter(n => !s.selectedNoteIds.includes(n.id));
+        if (filtered.length === track.midiNotes.length) return track; // No change
+        return { ...track, midiNotes: filtered };
+      });
+      return {
+        midiNotes,
+        tracks,
+        selectedNoteIds: [],
+      };
+    });
     console.log(`🗑️ Deleted ${deleteCount} selected notes`);
   },
 
@@ -2540,16 +3027,48 @@ export const useBeatStore = create<BeatStore>()(
       ? state.selectedNoteIds
       : state.midiNotes.map((n) => n.id);
 
+    if (noteIds.length === 0) {
+      console.log('⚡ Quantize: No notes to quantize');
+      return;
+    }
+
     get().pushUndoState();
-    set((s) => ({
-      midiNotes: s.midiNotes.map((note) => {
-        if (!noteIds.includes(note.id)) return note;
-        // Quantize to nearest snap value (e.g., 4 = quarter note, 1 = 16th note)
-        const quantizedStart = Math.round(note.startTime / snapValue) * snapValue;
-        return { ...note, startTime: quantizedStart };
-      }),
-    }));
-    console.log(`⚡ Quantized ${noteIds.length} notes to grid (snap: ${snapValue})`);
+
+    // Log before state for debugging
+    const beforePositions = state.midiNotes
+      .filter(n => noteIds.includes(n.id))
+      .map(n => ({ id: n.id.slice(-6), startTime: n.startTime, pitch: n.pitch }));
+    console.log(`⚡ Quantize BEFORE (snap=${snapValue}):`, beforePositions);
+
+    // Quantize global midiNotes
+    let movedCount = 0;
+    const quantizedMidiNotes = state.midiNotes.map((note) => {
+      if (!noteIds.includes(note.id)) return note;
+      const quantizedStart = Math.round(note.startTime / snapValue) * snapValue;
+      if (quantizedStart !== note.startTime) movedCount++;
+      return { ...note, startTime: quantizedStart };
+    });
+
+    // Dual-write: also quantize in per-track midiNotes arrays
+    const tracks = [...state.tracks];
+    tracks.forEach(track => {
+      if (track.type === 'instrument') {
+        track.midiNotes = track.midiNotes.map(note => {
+          if (!noteIds.includes(note.id)) return note;
+          const quantizedStart = Math.round(note.startTime / snapValue) * snapValue;
+          return { ...note, startTime: quantizedStart };
+        });
+      }
+    });
+
+    // Log after state
+    const afterPositions = quantizedMidiNotes
+      .filter(n => noteIds.includes(n.id))
+      .map(n => ({ id: n.id.slice(-6), startTime: n.startTime, pitch: n.pitch }));
+    console.log(`⚡ Quantize AFTER:`, afterPositions);
+    console.log(`⚡ Quantized ${noteIds.length} notes (${movedCount} moved) to grid (snap: ${snapValue}) — synced to tracks`);
+
+    set({ midiNotes: quantizedMidiNotes, tracks });
   },
 
   duplicateSelectedNotes: (offsetTime = 4) => {
@@ -2946,29 +3465,49 @@ export const useBeatStore = create<BeatStore>()(
     const pattern = state.patterns.find(p => p.id === patternId);
     if (!pattern) return;
 
-    if (pattern.type === 'drum' && pattern.pads && pattern.steps) {
-      // Restore pads (need to recreate Tone.js objects)
-      const restoredPads = pattern.pads.map(pad => ({
-        ...pad,
-        synth: pad.sample?.type === 'synth' && pad.sample.synthType
-          ? createSynth(pad.sample.synthType)
-          : null,
-        player: pad.sample?.type === 'audio' && pad.sample.url
-          ? new Tone.Player(pad.sample.url).connect(getMasterEffects().getInput())
-          : null,
-      }));
+    console.log(`🎹 Loading pattern: "${pattern.name}" (type: ${pattern.type}, id: ${patternId})`);
 
-      set({
-        pads: restoredPads,
-        steps: pattern.steps,
-        currentPatternId: patternId,
-      });
-    } else if (pattern.type === 'piano' && pattern.midiNotes) {
-      set({
-        midiNotes: pattern.midiNotes,
-        currentPatternId: patternId,
-      });
+    // Build a complete state update that resets ALL working data,
+    // then restores what the pattern has. This prevents cross-contamination
+    // between drum and piano data when switching pattern types.
+    const updates: Record<string, unknown> = {
+      currentPatternId: patternId,
+      selectedNoteIds: [], // Clear selection when switching patterns
+    };
+
+    if (pattern.type === 'drum') {
+      // Restore pads (recreate Tone.js objects), or reset to defaults if empty
+      if (pattern.pads && pattern.pads.length > 0) {
+        updates.pads = pattern.pads.map(pad => ({
+          ...pad,
+          synth: pad.sample?.type === 'synth' && pad.sample.synthType
+            ? createSynth(pad.sample.synthType)
+            : null,
+          player: pad.sample?.type === 'audio' && pad.sample.url
+            ? new Tone.Player(pad.sample.url).connect(getMixerInput())
+            : null,
+        }));
+      } else {
+        // Empty pads array (e.g. newly created pattern) → show default empty pads
+        updates.pads = createInitialPads();
+      }
+      updates.steps = pattern.steps || createInitialSteps(16, state.numSteps);
+      // Clear piano roll data so old notes don't persist
+      updates.midiNotes = [];
+    } else if (pattern.type === 'piano') {
+      // Restore MIDI notes
+      updates.midiNotes = pattern.midiNotes || [];
+      // Reset drum data to defaults so pads don't disappear
+      updates.pads = createInitialPads();
+      updates.steps = createInitialSteps(16, state.numSteps);
+    } else {
+      // Unknown type — reset everything to defaults
+      updates.pads = createInitialPads();
+      updates.steps = createInitialSteps(16, state.numSteps);
+      updates.midiNotes = [];
     }
+
+    set(updates);
 
     // Restore metadata
     if (pattern.bpm) set({ bpm: pattern.bpm });
@@ -3090,6 +3629,27 @@ export const useBeatStore = create<BeatStore>()(
     const state = get();
     const pattern = state.patterns.find(p => p.index === patternIndex);
     if (pattern) {
+      // Auto-save current working state back to the current pattern before switching
+      // (FL Studio behavior: pattern data is always preserved)
+      if (state.currentPatternId) {
+        const currentPattern = state.patterns.find(p => p.id === state.currentPatternId);
+        if (currentPattern) {
+          const updatedPatterns = state.patterns.map(p => {
+            if (p.id !== state.currentPatternId) return p;
+            const updated = { ...p };
+            if (p.type === 'drum') {
+              updated.pads = JSON.parse(JSON.stringify(state.pads.map(pad => ({ ...pad, synth: null, player: null }))));
+              updated.steps = JSON.parse(JSON.stringify(state.steps));
+            } else if (p.type === 'piano') {
+              updated.midiNotes = JSON.parse(JSON.stringify(state.midiNotes));
+            }
+            return updated;
+          });
+          set({ patterns: updatedPatterns });
+          console.log(`💾 Auto-saved Pattern ${state.currentPatternIndex} ("${currentPattern.name}") before switching`);
+        }
+      }
+
       get().loadPattern(pattern.id);
       set({ currentPatternIndex: patternIndex });
     }
@@ -3105,8 +3665,35 @@ export const useBeatStore = create<BeatStore>()(
       return '';
     }
 
+    // Auto-save current working state back to the current pattern before creating new
+    if (state.currentPatternId) {
+      const currentPattern = state.patterns.find(p => p.id === state.currentPatternId);
+      if (currentPattern) {
+        const updatedPatterns = state.patterns.map(p => {
+          if (p.id !== state.currentPatternId) return p;
+          const updated = { ...p };
+          if (p.type === 'drum') {
+            updated.pads = JSON.parse(JSON.stringify(state.pads.map(pad => ({ ...pad, synth: null, player: null }))));
+            updated.steps = JSON.parse(JSON.stringify(state.steps));
+          } else if (p.type === 'piano') {
+            updated.midiNotes = JSON.parse(JSON.stringify(state.midiNotes));
+          }
+          return updated;
+        });
+        set({ patterns: updatedPatterns });
+        console.log(`💾 Auto-saved Pattern ${state.currentPatternIndex} ("${currentPattern.name}") before creating new`);
+      }
+    }
+
     const patternName = name || `Pattern ${nextIndex}`;
     const newId = `pattern_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store serialized initial pads (not empty array) so they load properly
+    const serializedPads = createInitialPads().map(p => ({
+      ...p,
+      synth: null as any,
+      player: null as any,
+    }));
 
     const pattern: Pattern = {
       id: newId,
@@ -3119,20 +3706,27 @@ export const useBeatStore = create<BeatStore>()(
       numBars: state.numBars,
       color: PATTERN_COLORS[(nextIndex - 1) % PATTERN_COLORS.length],
       index: nextIndex,
-      pads: [],
+      pads: serializedPads,
       steps: createInitialSteps(16, state.numSteps),
     };
 
-    set((state) => ({
-      patterns: [...state.patterns, pattern],
+    // Add pattern AND reset working state to empty defaults
+    set({
+      patterns: [...get().patterns, pattern],
       currentPatternId: newId,
       currentPatternIndex: nextIndex,
-    }));
+      // Reset working state for the new empty pattern
+      pads: createInitialPads(),
+      steps: createInitialSteps(16, state.numSteps),
+      midiNotes: [],
+      selectedNoteIds: [],
+    });
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('beatshop_patterns', JSON.stringify(get().patterns));
     }
 
+    console.log(`🎹 New pattern created: "${patternName}" (#${nextIndex})`);
     return newId;
   },
 
@@ -3148,108 +3742,6 @@ export const useBeatStore = create<BeatStore>()(
     set((state) => ({
       playbackMode: state.playbackMode === 'PAT' ? 'SONG' : 'PAT',
     }));
-  },
-
-  // Channel Group Management
-  createChannelGroup: (name, color) => {
-    const newId = `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const groupColor = color || PATTERN_COLORS[get().channelGroups.length % PATTERN_COLORS.length];
-
-    set((state) => ({
-      channelGroups: [
-        ...state.channelGroups,
-        {
-          id: newId,
-          name,
-          color: groupColor,
-          collapsed: false,
-          channelIds: [],
-        },
-      ],
-    }));
-
-    return newId;
-  },
-
-  deleteChannelGroup: (groupId) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.filter(g => g.id !== groupId),
-      currentChannelFilter: state.currentChannelFilter === groupId ? 'all' : state.currentChannelFilter,
-    }));
-  },
-
-  renameChannelGroup: (groupId, newName) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.map(g =>
-        g.id === groupId ? { ...g, name: newName } : g
-      ),
-    }));
-  },
-
-  setChannelGroupColor: (groupId, color) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.map(g =>
-        g.id === groupId ? { ...g, color } : g
-      ),
-    }));
-  },
-
-  assignChannelToGroup: (padIndex, groupId) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.map(g => {
-        if (g.id === groupId) {
-          // Add channel to this group if not already present
-          if (!g.channelIds.includes(padIndex)) {
-            return { ...g, channelIds: [...g.channelIds, padIndex] };
-          }
-        } else {
-          // Remove channel from other groups
-          return { ...g, channelIds: g.channelIds.filter(id => id !== padIndex) };
-        }
-        return g;
-      }),
-    }));
-  },
-
-  removeChannelFromGroup: (padIndex, groupId) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.map(g =>
-        g.id === groupId
-          ? { ...g, channelIds: g.channelIds.filter(id => id !== padIndex) }
-          : g
-      ),
-    }));
-  },
-
-  setChannelFilter: (filter) => set({ currentChannelFilter: filter }),
-
-  toggleChannelGroupCollapsed: (groupId) => {
-    set((state) => ({
-      channelGroups: state.channelGroups.map(g =>
-        g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
-      ),
-    }));
-  },
-
-  getFilteredChannels: () => {
-    const state = get();
-    const filter = state.currentChannelFilter;
-
-    if (filter === 'all') {
-      return state.pads.map((_, i) => i);
-    }
-
-    if (filter === 'unsorted') {
-      // Return channels not in any group
-      const assignedChannels = new Set(
-        state.channelGroups.flatMap(g => g.channelIds)
-      );
-      return state.pads.map((_, i) => i).filter(i => !assignedChannels.has(i));
-    }
-
-    // Return channels in the specified group
-    const group = state.channelGroups.find(g => g.id === filter);
-    return group ? group.channelIds : [];
   },
 
   // Global swing and groove templates
@@ -3347,7 +3839,7 @@ export const useBeatStore = create<BeatStore>()(
 
   // Project restore action - restores full project state
   restoreProject: (projectData) => {
-    const updates: Partial<BeatState> = {};
+    const updates: Partial<BeatStore> = {};
 
     if (projectData.bpm !== undefined) {
       updates.bpm = projectData.bpm;
@@ -3377,40 +3869,96 @@ export const useBeatStore = create<BeatStore>()(
     }
     if (projectData.masterSettings) {
       const ms = projectData.masterSettings;
-      updates.masterVolume = ms.masterVolume;
-      updates.compressorThreshold = ms.compressorThreshold;
-      updates.compressorRatio = ms.compressorRatio;
-      updates.compressorAttack = ms.compressorAttack;
-      updates.compressorRelease = ms.compressorRelease;
-      updates.limiterThreshold = ms.limiterThreshold;
-      updates.eqLow = ms.eqLow;
-      updates.eqMid = ms.eqMid;
-      updates.eqHigh = ms.eqHigh;
-      updates.distortion = ms.distortion;
-      updates.reverb = ms.reverb;
-      updates.delay = ms.delay;
-      updates.stereoWidth = ms.stereoWidth;
-      updates.swing = ms.swing;
-      updates.patternLength = ms.patternLength;
+
+      // Build masterEffects object from project data
+      updates.masterEffects = {
+        volume: ms.masterVolume ?? get().masterEffects.volume,
+        compressorThreshold: ms.compressorThreshold ?? get().masterEffects.compressorThreshold,
+        compressorRatio: ms.compressorRatio ?? get().masterEffects.compressorRatio,
+        compressorAttack: ms.compressorAttack ?? get().masterEffects.compressorAttack,
+        compressorRelease: ms.compressorRelease ?? get().masterEffects.compressorRelease,
+        eqLow: ms.eqLow ?? get().masterEffects.eqLow,
+        eqMid: ms.eqMid ?? get().masterEffects.eqMid,
+        eqHigh: ms.eqHigh ?? get().masterEffects.eqHigh,
+        distortion: ms.distortion ?? get().masterEffects.distortion,
+        reverb: ms.reverb ?? get().masterEffects.reverb,
+        delay: ms.delay ?? get().masterEffects.delay,
+        stereoWidth: ms.stereoWidth ?? get().masterEffects.stereoWidth,
+        limiterThreshold: ms.limiterThreshold ?? get().masterEffects.limiterThreshold,
+        chorus: get().masterEffects.chorus,
+        phaser: get().masterEffects.phaser,
+        flanger: get().masterEffects.flanger,
+        bitcrusher: get().masterEffects.bitcrusher,
+      };
+
+      // Restore swing and patternLength as top-level properties
+      if (ms.swing !== undefined) updates.swing = ms.swing;
+      if (ms.patternLength !== undefined) updates.patternLength = ms.patternLength;
 
       // Apply master effects to Tone.js
-      const masterEffects = getMasterEffects();
-      if (ms.masterVolume !== undefined) masterEffects.setMasterVolume(ms.masterVolume);
-      if (ms.compressorThreshold !== undefined) masterEffects.setCompressorThreshold(ms.compressorThreshold);
-      if (ms.compressorRatio !== undefined) masterEffects.setCompressorRatio(ms.compressorRatio);
-      if (ms.compressorAttack !== undefined) masterEffects.setCompressorAttack(ms.compressorAttack);
-      if (ms.compressorRelease !== undefined) masterEffects.setCompressorRelease(ms.compressorRelease);
-      if (ms.limiterThreshold !== undefined) masterEffects.setLimiterThreshold(ms.limiterThreshold);
-      if (ms.eqLow !== undefined) masterEffects.setEqLow(ms.eqLow);
-      if (ms.eqMid !== undefined) masterEffects.setEqMid(ms.eqMid);
-      if (ms.eqHigh !== undefined) masterEffects.setEqHigh(ms.eqHigh);
-      if (ms.distortion !== undefined) masterEffects.setDistortion(ms.distortion);
-      if (ms.reverb !== undefined) masterEffects.setReverb(ms.reverb);
-      if (ms.delay !== undefined) masterEffects.setDelay(ms.delay);
-      if (ms.stereoWidth !== undefined) masterEffects.setStereoWidth(ms.stereoWidth);
+      const masterEffectsEngine = getMasterEffects();
+      if (ms.masterVolume !== undefined) masterEffectsEngine.setMasterVolume(ms.masterVolume);
+      if (ms.compressorThreshold !== undefined) masterEffectsEngine.setCompressorThreshold(ms.compressorThreshold);
+      if (ms.compressorRatio !== undefined) masterEffectsEngine.setCompressorRatio(ms.compressorRatio);
+      if (ms.compressorAttack !== undefined) masterEffectsEngine.setCompressorAttack(ms.compressorAttack);
+      if (ms.compressorRelease !== undefined) masterEffectsEngine.setCompressorRelease(ms.compressorRelease);
+      if (ms.limiterThreshold !== undefined) masterEffectsEngine.setLimiterThreshold(ms.limiterThreshold);
+      if (ms.eqLow !== undefined) masterEffectsEngine.setEqLow(ms.eqLow);
+      if (ms.eqMid !== undefined) masterEffectsEngine.setEqMid(ms.eqMid);
+      if (ms.eqHigh !== undefined) masterEffectsEngine.setEqHigh(ms.eqHigh);
+      if (ms.distortion !== undefined) masterEffectsEngine.setDistortion(ms.distortion);
+      if (ms.reverb !== undefined) masterEffectsEngine.setReverbWet(ms.reverb);
+      if (ms.delay !== undefined) masterEffectsEngine.setDelayWet(ms.delay);
+      if (ms.stereoWidth !== undefined) masterEffectsEngine.setStereoWidth(ms.stereoWidth);
     }
 
     set(updates);
+  },
+
+  // Reset to defaults - clears localStorage and resets all state to initial values
+  resetToDefaults: () => {
+    // Stop any playing audio first
+    Tone.getTransport().stop();
+    Tone.getTransport().position = 0;
+
+    // Clear localStorage for this app
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('beatshop-storage');
+      localStorage.removeItem('beatshop_patterns');
+      localStorage.removeItem('midiMappings');
+      localStorage.removeItem('userPreferences');
+      console.log('🧹 localStorage cleared');
+    }
+
+    // Reset all state to defaults
+    set({
+      bpm: 120,
+      isPlaying: false,
+      isArmed: false,
+      isRecording: false,
+      isCountingIn: false,
+      countInStep: 0,
+      currentStep: 0,
+      numBars: 4,
+      numSteps: 64,
+      patternLength: 64,
+      swing: 0,
+      timeSignature: '4/4',
+      midiNotes: [],
+      steps: createInitialSteps(16, 64),
+      tracks: [],
+      patterns: [],
+      currentPatternId: null,
+      currentPatternIndex: 1,
+      arrangementClips: [],
+      selectedNoteIds: [],
+      noteClipboard: [],
+      mutedNoteIds: [],
+      undoStack: [],
+      redoStack: [],
+    });
+
+    console.log('🔄 State reset to defaults - refresh the page for a fresh start');
   },
 
   // =====================================================
@@ -3584,10 +4132,26 @@ export const useBeatStore = create<BeatStore>()(
   setCurrentMode: (mode) => set({ currentMode: mode }),
 
   // MPC Transport Actions
-  playFromStart: () => {
-    set({ currentStep: 0 });
+  playFromStart: async () => {
+    // Ensure AudioContext is fully running
+    await Tone.start();
+    if (Tone.getContext().state !== 'running') {
+      await Tone.getContext().resume();
+    }
+    if (Tone.getContext().state !== 'running') {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Tone.getContext().resume();
+    }
+
+    // Stop any current playback first
+    Tone.getTransport().stop();
     Tone.getTransport().position = 0;
+    set({ currentStep: 0 });
+
+    // Start from beginning
+    Tone.getTransport().start();
     set({ isPlaying: true });
+    console.log('▶️ [Store] Play from start');
   },
 
   copyPattern: () => {
@@ -3637,13 +4201,6 @@ export const useBeatStore = create<BeatStore>()(
     console.log(`📋 Pattern pasted from clipboard (${state.patternClipboard.steps.filter(s => s.active).length} active steps, ${state.patternClipboard.midiNotes.length} MIDI notes)`);
   },
 
-  deleteSelectedNotes: () => {
-    // Delete all notes that are selected (future: implement selection state)
-    // For now, clear all MIDI notes
-    get().pushUndoState();
-    set({ midiNotes: [] });
-  },
-
   // Get effective velocity based on level modes
   getEffectiveVelocity: (padIndex, inputVelocity = 100) => {
     const state = get();
@@ -3680,6 +4237,7 @@ export const useBeatStore = create<BeatStore>()(
         padMode: state.padMode,
         steps: state.steps,
         numSteps: state.numSteps,
+        numBars: state.numBars,
         patternLength: state.patternLength,
         swing: state.swing,
         timeSignature: state.timeSignature,
@@ -3710,3 +4268,7 @@ export const useBeatStore = create<BeatStore>()(
   )
 );
 
+// Expose store globally for testing and debugging
+if (typeof window !== 'undefined') {
+  (window as typeof window & { useBeatStore: typeof useBeatStore }).useBeatStore = useBeatStore;
+}

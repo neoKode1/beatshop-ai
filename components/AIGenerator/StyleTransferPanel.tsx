@@ -3,7 +3,6 @@
 import React, { useState, useRef } from 'react';
 import {
   Upload,
-  Music,
   Play,
   Pause,
   X,
@@ -68,7 +67,7 @@ const StyleTransferPanel: React.FC = () => {
     <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <Sparkles className="text-purple-400" size={20} />
+        <Sparkles className="text-amber-400" size={20} />
         <h3 className="text-lg font-bold text-white">Style Transfer</h3>
       </div>
       
@@ -87,12 +86,12 @@ const StyleTransferPanel: React.FC = () => {
       {!referenceAudioUrl ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="p-6 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800/50 hover:border-purple-500/50 transition-all"
+          className="p-6 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:bg-gray-800/50 hover:border-amber-500/50 transition-all"
         >
           <div className="flex flex-col items-center gap-2 text-center">
             {isUploading ? (
               <>
-                <Loader2 size={32} className="text-purple-400 animate-spin" />
+                <Loader2 size={32} className="text-amber-400 animate-spin" />
                 <p className="text-sm text-gray-300">Uploading...</p>
               </>
             ) : (
@@ -116,7 +115,7 @@ const StyleTransferPanel: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={togglePlayback}
-              className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 rounded-full bg-amber-600 hover:bg-amber-700 flex items-center justify-center flex-shrink-0"
             >
               {isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
             </button>
@@ -153,7 +152,7 @@ const StyleTransferPanel: React.FC = () => {
               max={100}
               value={transferStrength * 100}
               onChange={(e) => setTransferStrength(parseInt(e.target.value) / 100)}
-              className="w-full accent-purple-500"
+              className="w-full accent-amber-500"
             />
             <div className="flex justify-between text-[10px] text-gray-500 mt-1">
               <span>Original Style</span>
@@ -170,7 +169,7 @@ const StyleTransferPanel: React.FC = () => {
               value={currentParams.prompt || ''}
               onChange={(e) => setParams({ prompt: e.target.value })}
               placeholder="E.g., Remix this with a modern trap style..."
-              className="w-full h-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full h-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               disabled={isGenerating}
             />
           </div>
@@ -182,7 +181,7 @@ const StyleTransferPanel: React.FC = () => {
             className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
               isGenerating || !currentParams.prompt
                 ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg'
+                : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg'
             }`}
           >
             {isGenerating ? (

@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useBeatStore, Pad, ChannelGroup } from '@/store/useBeatStore';
-import { Volume2, VolumeX, Headphones, FolderPlus, ChevronDown, ChevronRight, Trash2, Users } from 'lucide-react';
+import { FolderPlus, ChevronDown, ChevronRight, Trash2, Users } from 'lucide-react';
 import * as Tone from 'tone';
+import { getMixer } from '@/lib/audio/core/Mixer';
+import type { Channel } from '@/lib/audio/core/Channel';
 
 // Vertical Fader Component
 const VerticalFader: React.FC<{
@@ -245,6 +247,88 @@ const VolumeMeter: React.FC<{
   );
 };
 
+// Channel Meter Component - Reads real peak level from a Channel's AnalyserNode
+const ChannelMeter: React.FC<{
+  channel: Channel | null;
+  height?: number;
+  color?: string;
+}> = ({ channel, height = 80, color = '#4CAF50' }) => {
+  const [level, setLevel] = useState(0);
+  const [peak, setPeak] = useState(0);
+  const animationRef = useRef<number>(0);
+  const peakHoldRef = useRef<number>(0);
+  const { isPlaying } = useBeatStore();
+
+  useEffect(() => {
+    const updateMeter = () => {
+      if (channel) {
+        const peakLevel = channel.getPeakLevel();
+        setLevel(peakLevel);
+
+        if (peakLevel > peak) {
+          setPeak(peakLevel);
+          peakHoldRef.current = Date.now();
+        } else if (Date.now() - peakHoldRef.current > 1000) {
+          setPeak(prev => Math.max(peakLevel, prev * 0.95));
+        }
+      }
+      animationRef.current = requestAnimationFrame(updateMeter);
+    };
+
+    if (isPlaying && channel) {
+      updateMeter();
+    } else {
+      setLevel(0);
+      setPeak(0);
+    }
+
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [isPlaying, channel, peak]);
+
+  const getMeterColor = (lvl: number) => {
+    if (lvl > 0.9) return '#ef4444';
+    if (lvl > 0.7) return '#f59e0b';
+    return color;
+  };
+
+  return (
+    <div className="flex gap-0.5" style={{ height }}>
+      <div className="w-2 bg-gray-900 rounded-sm relative overflow-hidden border border-gray-700">
+        <div
+          className="absolute bottom-0 left-0 right-0 transition-all duration-75"
+          style={{
+            height: `${level * 100}%`,
+            background: `linear-gradient(to top, ${getMeterColor(level)}, ${getMeterColor(level)}88)`,
+          }}
+        />
+        {peak > 0 && (
+          <div
+            className="absolute left-0 right-0 h-0.5"
+            style={{ bottom: `${peak * 100}%`, backgroundColor: getMeterColor(peak) }}
+          />
+        )}
+      </div>
+      <div className="w-2 bg-gray-900 rounded-sm relative overflow-hidden border border-gray-700">
+        <div
+          className="absolute bottom-0 left-0 right-0 transition-all duration-75"
+          style={{
+            height: `${level * 98}%`,
+            background: `linear-gradient(to top, ${getMeterColor(level)}, ${getMeterColor(level)}88)`,
+          }}
+        />
+        {peak > 0 && (
+          <div
+            className="absolute left-0 right-0 h-0.5"
+            style={{ bottom: `${peak * 100}%`, backgroundColor: getMeterColor(peak) }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Channel Strip Component
 const ChannelStrip: React.FC<{
   pad: Pad;
@@ -450,6 +534,39 @@ const ChannelMixer: React.FC = () => {
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
 
+  // Real Mixer master Channel reference
+  const masterChannelRef = useRef<Channel | null>(null);
+  const [masterVolume, setMasterVolume] = useState(0.8);
+  const [masterPan, setMasterPan] = useState(0);
+
+  // Initialize the mixer master ref on mount
+  useEffect(() => {
+    try {
+      const mixer = getMixer();
+      masterChannelRef.current = mixer.master;
+      setMasterVolume(mixer.master.volume);
+      setMasterPan(mixer.master.panning);
+    } catch {
+      // Mixer may not be ready yet (SSR or no AudioContext)
+    }
+  }, []);
+
+  // Sync master volume to real Channel
+  const handleMasterVolumeChange = useCallback((v: number) => {
+    setMasterVolume(v);
+    if (masterChannelRef.current) {
+      masterChannelRef.current.volume = v;
+    }
+  }, []);
+
+  // Sync master pan to real Channel
+  const handleMasterPanChange = useCallback((p: number) => {
+    setMasterPan(p);
+    if (masterChannelRef.current) {
+      masterChannelRef.current.panning = p;
+    }
+  }, []);
+
   // Only show pads that have samples assigned
   const activeChannels = pads.map((pad, index) => ({ pad, index }));
 
@@ -545,17 +662,17 @@ const ChannelMixer: React.FC = () => {
             />
           ))}
 
-          {/* Master Channel */}
-          <div className="flex flex-col items-center p-2 rounded-lg bg-purple-900/30 border border-purple-700/50 ml-4" style={{ minWidth: '80px' }}>
-            <div className="w-full text-center text-[10px] font-bold text-white py-1 rounded-t mb-2 bg-purple-600">
+          {/* Master Channel — wired to real Mixer master */}
+          <div className="flex flex-col items-center p-2 rounded-lg bg-amber-900/30 border border-amber-700/50 ml-4" style={{ minWidth: '80px' }}>
+            <div className="w-full text-center text-[10px] font-bold text-white py-1 rounded-t mb-2 bg-amber-600">
               MASTER
             </div>
-            <PanKnob value={0} onChange={() => {}} />
+            <PanKnob value={masterPan} onChange={handleMasterPanChange} />
             <div className="my-2 flex gap-1 items-center">
-              <VolumeMeter height={96} color="#9333ea" />
-              <VerticalFader value={0.8} onChange={() => {}} color="#9333ea" />
+              <ChannelMeter channel={masterChannelRef.current} height={96} color="#f59e0b" />
+              <VerticalFader value={masterVolume} onChange={handleMasterVolumeChange} color="#f59e0b" />
             </div>
-            <span className="text-[9px] text-purple-300">Master Out</span>
+            <span className="text-[9px] text-amber-300">Master Out</span>
           </div>
         </div>
       </div>

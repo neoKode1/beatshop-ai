@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useBeatStore } from '@/store/useBeatStore';
 import { midiService } from '@/lib/audio/midiService';
-import { X, Settings, Trash2, Loader, Music, AlertCircle, Check, Zap } from 'lucide-react';
+import { X, Settings, Trash2, Loader, AlertCircle, Check, Zap } from 'lucide-react';
 
 interface MIDILearnPanelProps {
   onClose: () => void;

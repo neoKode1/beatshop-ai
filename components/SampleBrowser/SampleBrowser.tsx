@@ -387,58 +387,73 @@ const SampleBrowser: React.FC = () => {
     dragHandlers.onDragEnd();
   };
 
-  // Render a folder item with samples
+  // Render a folder item with samples - FL Studio tree-view style
   const renderFolder = (folder: UserFolder, depth: number = 0) => (
-    <div key={folder.id} className="mb-2">
-      {/* Folder header */}
+    <div key={folder.id}>
+      {/* Folder header - FL Studio compact row */}
       <div
-        className="flex items-center gap-2 px-2 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 cursor-pointer transition-all group"
-        style={{ marginLeft: depth * 12 }}
+        className="flex items-center gap-1.5 group"
+        style={{
+          height: '24px',
+          paddingLeft: `${depth * 14 + 6}px`,
+          paddingRight: '6px',
+          cursor: 'pointer',
+          background: 'transparent',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = '#597b9f40')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
-        <button onClick={() => toggleFolder(folder.id)} className="flex items-center gap-2 flex-1">
-          {folder.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Folder size={16} className="text-yellow-500" />
-          <span className="text-sm font-medium text-gray-300 truncate">{folder.name}</span>
-          <span className="text-xs text-gray-500 ml-auto">
+        <button onClick={() => toggleFolder(folder.id)} className="flex items-center gap-1.5 flex-1 min-w-0">
+          {folder.isExpanded ? <ChevronDown size={12} className="flex-shrink-0 text-[var(--fl-text-dim)]" /> : <ChevronRight size={12} className="flex-shrink-0 text-[var(--fl-text-dim)]" />}
+          <Folder size={13} className="flex-shrink-0 text-yellow-600" />
+          <span className="text-[11px] text-[var(--fl-text-primary)] truncate">{folder.name}</span>
+          <span className="text-[10px] text-[var(--fl-text-dim)] ml-auto flex-shrink-0">
             {folder.samples.length + folder.subfolders.reduce((acc, sf) => acc + sf.samples.length, 0)}
           </span>
         </button>
         {depth === 0 && (
           <button
             onClick={() => removeFolder(folder.id)}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
+            className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-500/20 transition-all flex-shrink-0"
             title="Remove folder"
           >
-            <Trash2 size={14} className="text-red-400" />
+            <Trash2 size={12} className="text-red-400" />
           </button>
         )}
       </div>
 
       {/* Folder contents */}
       {folder.isExpanded && (
-        <div className="mt-1 space-y-1">
+        <div>
           {/* Subfolders */}
           {folder.subfolders.map(sub => renderFolder(sub, depth + 1))}
 
-          {/* Samples in this folder */}
+          {/* Samples in this folder - FL Studio compact rows */}
           {folder.samples.map(sample => (
             <div
               key={sample.id}
               draggable
               onDragStart={(e) => handleDragStart(e, sample)}
               onDragEnd={handleDragEnd}
-              className="flex items-center justify-between px-3 py-2 ml-6 rounded bg-gray-800/30 hover:bg-gray-700/50 cursor-move transition-all border border-transparent hover:border-purple-500/50"
-              style={{ marginLeft: (depth + 1) * 12 + 8 }}
+              className="flex items-center cursor-move"
+              style={{
+                height: '22px',
+                paddingLeft: `${(depth + 1) * 14 + 20}px`,
+                paddingRight: '6px',
+                background: 'transparent',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#597b9f40')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <div
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => previewSample(sample)}
               >
-                <div className="text-xs font-medium text-gray-300 truncate hover:text-purple-400 transition-colors">{sample.name}</div>
+                <span className="text-[11px] text-[var(--fl-text-secondary)] truncate block hover:text-[var(--fl-accent-amber)]">{sample.name}</span>
               </div>
               <button
                 onClick={() => previewSample(sample)}
-                className="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 ml-2 flex-shrink-0"
+                className="text-[10px] text-[var(--fl-text-dim)] hover:text-[var(--fl-accent-amber)] ml-1 flex-shrink-0"
               >
                 ▶
               </button>
@@ -450,11 +465,11 @@ const SampleBrowser: React.FC = () => {
   );
 
   return (
-    <div className="sample-browser h-full flex flex-col">
-      {/* BEATSHOP Branding */}
-      <div className="p-4 border-b-2 border-gray-900/50 bg-gradient-to-r from-[#1A1A1A] to-[#252525]">
+    <div className="sample-browser h-full flex flex-col" style={{ background: 'var(--fl-panel-bg)' }}>
+      {/* BEATSHOP Branding - FL Studio compact header */}
+      <div style={{ padding: '8px 10px', background: 'var(--fl-panel-darker)', borderBottom: '1px solid var(--fl-panel-border)' }}>
         <h1
-          className="text-2xl font-black tracking-wider text-gray-100 text-center"
+          className="text-lg font-black tracking-wider text-center"
           style={{
             fontFamily: '"Orbitron", "Share Tech Mono", "Rajdhani", monospace',
             letterSpacing: '3px',
@@ -469,37 +484,46 @@ const SampleBrowser: React.FC = () => {
         </h1>
       </div>
 
-      {/* Sample Library Header with View Mode Toggle */}
-      <div className="p-4 border-b-2 border-gray-900/50">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Sample Library</h2>
-        </div>
+      {/* View Mode Tabs - FL Studio tab bar */}
+      <div style={{ display: 'flex', background: 'var(--fl-panel-darker)', borderBottom: '1px solid var(--fl-panel-border)' }}>
+        <button
+          onClick={() => setViewMode('library')}
+          style={{
+            flex: 1,
+            height: '26px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            background: viewMode === 'library' ? 'var(--fl-panel-medium)' : 'transparent',
+            color: viewMode === 'library' ? 'var(--fl-accent-amber)' : 'var(--fl-text-secondary)',
+            borderBottom: viewMode === 'library' ? '2px solid var(--fl-accent-amber)' : '2px solid transparent',
+          }}
+        >
+          Library
+        </button>
+        <button
+          onClick={() => setViewMode('folders')}
+          style={{
+            flex: 1,
+            height: '26px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            background: viewMode === 'folders' ? 'var(--fl-panel-medium)' : 'transparent',
+            color: viewMode === 'folders' ? 'var(--fl-accent-amber)' : 'var(--fl-text-secondary)',
+            borderBottom: viewMode === 'folders' ? '2px solid var(--fl-accent-amber)' : '2px solid transparent',
+          }}
+        >
+          My Folders {userFolders.length > 0 && `(${userFolders.length})`}
+        </button>
+      </div>
 
-        {/* View Mode Tabs */}
-        <div className="flex gap-1 mb-3 bg-gray-900/50 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('library')}
-            className={`flex-1 px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              viewMode === 'library'
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            Library
-          </button>
-          <button
-            onClick={() => setViewMode('folders')}
-            className={`flex-1 px-3 py-1.5 rounded text-xs font-bold transition-all ${
-              viewMode === 'folders'
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            My Folders {userFolders.length > 0 && `(${userFolders.length})`}
-          </button>
-        </div>
-
-        {/* Add Folder Button */}
+      {/* Add Folder Button - FL Studio compact */}
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--fl-panel-border)' }}>
         <input
           ref={folderInputRef}
           type="file"
@@ -511,64 +535,96 @@ const SampleBrowser: React.FC = () => {
         />
         <button
           onClick={() => folderInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-sm font-bold transition-all shadow-lg mb-3"
+          style={{
+            width: '100%',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            color: 'var(--fl-text-primary)',
+            background: 'linear-gradient(180deg, var(--fl-panel-light) 0%, var(--fl-panel-medium) 100%)',
+            border: '1px solid var(--fl-panel-border)',
+            cursor: 'pointer',
+          }}
         >
-          <FolderPlus size={16} />
+          <FolderPlus size={13} />
           Add Folder
         </button>
-
-        {/* Category Filter - only show in library mode */}
-        {viewMode === 'library' && (
-          <div className="space-y-1">
-            {categories.map(cat => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all font-semibold ${
-                    selectedCategory === cat.id
-                      ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white shadow-lg'
-                      : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span>{cat.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Category Filter - FL Studio tree-view style, only in library mode */}
+      {viewMode === 'library' && (
+        <div style={{ borderBottom: '1px solid var(--fl-panel-border)' }}>
+          {categories.map(cat => {
+            const Icon = cat.icon;
+            const isActive = selectedCategory === cat.id;
+            return (
+              <div
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                style={{
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  paddingLeft: '10px',
+                  paddingRight: '8px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: isActive ? 'bold' : 'normal',
+                  color: isActive ? 'var(--fl-text-primary)' : 'var(--fl-text-secondary)',
+                  background: isActive ? '#597b9f40' : 'transparent',
+                  borderLeft: isActive ? '2px solid var(--fl-accent-amber)' : '2px solid transparent',
+                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#597b9f20'; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <Icon size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                <span>{cat.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Content Area - FL Studio tree-view / list */}
+      <div className="flex-1 overflow-y-auto" style={{ padding: '2px 0' }}>
         {viewMode === 'library' ? (
-          /* Sample List - Library Mode */
-          <div className="space-y-2">
+          /* Sample List - FL Studio compact rows */
+          <div>
             {filteredSamples.map(sample => (
               <div
                 key={sample.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, sample)}
                 onDragEnd={handleDragEnd}
-                className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 hover:from-gray-700/80 hover:to-gray-800/80 rounded-lg p-3 cursor-move transition-all border border-gray-700/50 hover:border-purple-500/70 shadow-md"
+                className="flex items-center cursor-move"
+                style={{
+                  height: '24px',
+                  paddingLeft: '10px',
+                  paddingRight: '8px',
+                  background: 'transparent',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#597b9f40')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                <div className="flex items-center justify-between">
-                  <div
-                    className="flex-1 cursor-pointer"
-                    onClick={() => previewSample(sample)}
-                  >
-                    <div className="text-sm font-medium text-gray-200 hover:text-purple-400 transition-colors">{sample.name}</div>
-                    <div className="text-xs text-gray-500 uppercase font-semibold">{sample.category}</div>
-                  </div>
-                  <button
-                    onClick={() => previewSample(sample)}
-                    className="px-3 py-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 rounded text-xs font-bold text-white shadow-md transition-all"
-                  >
-                    Preview
-                  </button>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer flex items-center gap-2"
+                  onClick={() => previewSample(sample)}
+                >
+                  <Music size={11} style={{ flexShrink: 0, opacity: 0.5 }} />
+                  <span className="text-[11px] text-[var(--fl-text-primary)] truncate hover:text-[var(--fl-accent-amber)]">{sample.name}</span>
+                  <span className="text-[9px] text-[var(--fl-text-dim)] uppercase ml-auto flex-shrink-0">{sample.category}</span>
                 </div>
+                <button
+                  onClick={() => previewSample(sample)}
+                  className="text-[10px] text-[var(--fl-text-dim)] hover:text-[var(--fl-accent-amber)] ml-1.5 flex-shrink-0"
+                >
+                  ▶
+                </button>
               </div>
             ))}
           </div>
@@ -577,14 +633,14 @@ const SampleBrowser: React.FC = () => {
           <div>
             {userFolders.length === 0 ? (
               <div className="text-center py-8">
-                <Folder size={48} className="mx-auto text-gray-600 mb-3" />
-                <p className="text-gray-500 text-sm mb-2">No folders added yet</p>
-                <p className="text-gray-600 text-xs">
-                  Click "Add Folder" to import your sample collection
+                <Folder size={36} className="mx-auto mb-2" style={{ color: 'var(--fl-text-dim)' }} />
+                <p className="text-[11px] mb-1" style={{ color: 'var(--fl-text-dim)' }}>No folders added yet</p>
+                <p className="text-[10px]" style={{ color: 'var(--fl-text-dim)', opacity: 0.6 }}>
+                  Click &quot;Add Folder&quot; to import samples
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div>
                 {userFolders.map(folder => renderFolder(folder))}
               </div>
             )}
@@ -592,10 +648,10 @@ const SampleBrowser: React.FC = () => {
         )}
       </div>
 
-      {/* Instructions */}
-      <div className="p-4 border-t-2 border-gray-900/50 bg-gradient-to-b from-[#1F1F1F] to-[#1A1A1A]">
-        <p className="text-xs text-gray-500">
-          💡 Drag samples to pads, sequencer, or click a pad to select
+      {/* Footer - FL Studio style */}
+      <div style={{ padding: '4px 10px', background: 'var(--fl-panel-darker)', borderTop: '1px solid var(--fl-panel-border)' }}>
+        <p className="text-[10px]" style={{ color: 'var(--fl-text-dim)' }}>
+          💡 Drag samples to pads or sequencer
         </p>
       </div>
     </div>

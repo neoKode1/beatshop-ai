@@ -44,12 +44,9 @@ const semitoneToPlaybackRate = (semitone: number, rootSemitone: number = 0): num
 const PianoKeyboard: React.FC = () => {
   const {
     pads,
-    padMode,
-    assignSampleToPad,
     // Track system
     addTrack,
     isRecording,
-    isPlaying,
     isCountingIn,
   } = useBeatStore();
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
@@ -180,6 +177,9 @@ const PianoKeyboard: React.FC = () => {
   }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Don't trigger piano notes when modifier keys are held (Ctrl+Q = quantize, not a note)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
     const key = e.key.toUpperCase();
     const pianoKey = PIANO_KEYS.find(k => k.key === key);
 
@@ -204,14 +204,19 @@ const PianoKeyboard: React.FC = () => {
     }
   }, [stopNote]);
 
+  // Only listen for keyboard events when Typing Keyboard to Piano is ON (Ctrl+T)
+  const { typingKeyboardEnabled } = useBeatStore();
+
   useEffect(() => {
+    if (!typingKeyboardEnabled) return; // Don't capture keys when toggle is OFF
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [handleKeyDown, handleKeyUp, typingKeyboardEnabled]);
 
   const handleMouseDown = (note: string) => {
     setActiveKeys(prev => new Set(prev).add(note));
@@ -329,7 +334,7 @@ const PianoKeyboard: React.FC = () => {
     <div
       className={`piano-keyboard h-full w-full p-2 bg-gradient-to-br from-[#2A2A2A] to-[#1F1F1F] rounded-xl shadow-[inset_0_2px_8px_rgba(0,0,0,0.6),0_4px_12px_rgba(0,0,0,0.4)] border-2 transition-all duration-200 flex flex-col ${
         isDragOverKeyboard
-          ? 'border-purple-500 ring-2 ring-purple-500/50'
+          ? 'border-amber-500 ring-2 ring-amber-500/50'
           : loadedSample
             ? 'border-green-600/50'
             : 'border-gray-800/50'
@@ -360,8 +365,8 @@ const PianoKeyboard: React.FC = () => {
 
       {/* Drag overlay hint */}
       {isDragOverKeyboard && (
-        <div className="absolute inset-0 flex items-center justify-center bg-purple-900/40 rounded-xl z-50 pointer-events-none">
-          <div className="text-purple-200 text-sm font-bold">
+        <div className="absolute inset-0 flex items-center justify-center bg-amber-900/40 rounded-xl z-50 pointer-events-none">
+          <div className="text-amber-200 text-sm font-bold">
             Drop sample for chromatic playback
           </div>
         </div>
@@ -392,18 +397,18 @@ const PianoKeyboard: React.FC = () => {
                 ${isWhite
                   ? 'relative h-full z-0 flex-1 min-w-0'
                   : 'absolute h-[60%] z-10'}
-                ${isDragOver ? 'ring-2 ring-purple-500 ring-inset' : ''}
+                ${isDragOver ? 'ring-2 ring-amber-500 ring-inset' : ''}
                 ${hasSample && isWhite ? 'ring-1 ring-green-500/30' : ''}
                 ${isWhite
                   ? isActive
                     ? 'bg-gradient-to-b from-green-300 to-green-400 shadow-[inset_0_4px_8px_rgba(0,0,0,0.4)]'
                     : isDragOver
-                      ? 'bg-gradient-to-b from-purple-200 to-purple-300 shadow-[0_4px_8px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.8)]'
+                      ? 'bg-gradient-to-b from-amber-200 to-amber-300 shadow-[0_4px_8px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.8)]'
                       : 'bg-gradient-to-b from-gray-100 to-gray-200 shadow-[0_4px_8px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.8)]'
                   : isActive
                     ? 'bg-gradient-to-b from-green-700 to-green-800 shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)]'
                     : isDragOver
-                      ? 'bg-gradient-to-b from-purple-800 to-purple-900 shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)]'
+                      ? 'bg-gradient-to-b from-amber-800 to-amber-900 shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)]'
                       : 'bg-gradient-to-b from-gray-900 to-black shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)]'
                 }
                 border ${isWhite ? 'border-gray-400/50' : 'border-black'}

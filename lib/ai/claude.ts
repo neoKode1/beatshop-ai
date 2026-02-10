@@ -92,7 +92,7 @@ Guidelines:
       throw new Error('Failed to parse AI response');
     } catch (error) {
       console.error('AI generation error:', error);
-      return this.generateDemoPattern(style, bpm);
+      return this.generateDemoPattern(style, bpm, availablePads);
     }
   }
 

@@ -9,7 +9,7 @@ import AIGeneratorPanel from './AIGenerator/AIGeneratorPanel';
 import FLToolbar from './Toolbar/FLToolbar';
 import ProjectManager from './ProjectManager/ProjectManager';
 import SessionRestore from './SessionRestore/SessionRestore';
-import { ChevronLeft, ChevronRight, Settings, Wand2, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Wand2, MessageSquare } from 'lucide-react';
 import { useBeatStore } from '@/store/useBeatStore';
 
 const BeatShopApp: React.FC = () => {
@@ -37,21 +37,21 @@ const BeatShopApp: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#1A1A1A]">
+    <div className="h-screen flex flex-col bg-[var(--fl-panel-darker)]">
       {/* Session Restore Prompt */}
       <SessionRestore />
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Sample Browser */}
-        <aside className="w-80 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-r-2 border-gray-900/50 overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.5)]">
+        <aside className="w-80 bg-[var(--fl-panel-bg)] border-r border-[var(--fl-panel-border)] overflow-y-auto shadow-[inset_-1px_0_0_#00000040]">
           <SampleBrowser />
         </aside>
 
         {/* Center Workspace */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gradient-to-b from-[#2A2A2A] to-[#252525]">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[var(--fl-panel-medium)]">
           <FLToolbar />
-          <div className="flex-1 p-3 min-h-0 overflow-hidden">
+          <div className="flex-1 p-2 min-h-0 overflow-y-auto">
             {/* Show BeatMachine in PAT mode, ArrangementView in SONG mode */}
             {playbackMode === 'PAT' ? (
               <BeatMachine />
@@ -63,29 +63,29 @@ const BeatShopApp: React.FC = () => {
 
         {/* Right Panel - AI Panel (Collapsible) */}
         {isAIPanelOpen && (
-          <aside className="w-96 bg-gradient-to-b from-[#252525] to-[#1A1A1A] border-l-2 border-gray-900/50 overflow-hidden shadow-[-2px_0_8px_rgba(0,0,0,0.5)] relative flex flex-col">
+          <aside className="w-96 bg-[var(--fl-panel-bg)] border-l border-[var(--fl-panel-border)] overflow-hidden relative flex flex-col shadow-[inset_1px_0_0_#00000040]">
             {/* AI Panel Mode Switcher */}
-            <div className="flex border-b border-gray-800 bg-gray-900/50">
+            <div className="flex bg-[var(--fl-panel-darker)] border-b border-[var(--fl-panel-border)]">
               <button
                 onClick={() => setAIPanelMode('generator')}
-                className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 px-3 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-all duration-300 ${
                   aiPanelMode === 'generator'
-                    ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-400/10'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                    ? 'text-[var(--fl-accent-amber)] border-b-2 border-[var(--fl-accent-amber)] bg-[var(--fl-accent-amber)]/10'
+                    : 'text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-panel-medium)]'
                 }`}
               >
-                <Wand2 size={14} />
+                <Wand2 size={12} />
                 AI Generator
               </button>
               <button
                 onClick={() => setAIPanelMode('assistant')}
-                className={`flex-1 py-2 px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 px-3 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-all duration-300 ${
                   aiPanelMode === 'assistant'
-                    ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-400/10'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                    ? 'text-[var(--fl-accent-amber)] border-b-2 border-[var(--fl-accent-amber)] bg-[var(--fl-accent-amber)]/10'
+                    : 'text-[var(--fl-text-secondary)] hover:text-[var(--fl-text-primary)] hover:bg-[var(--fl-panel-medium)]'
                 }`}
               >
-                <MessageSquare size={14} />
+                <MessageSquare size={12} />
                 AI Assistant
               </button>
             </div>
@@ -98,10 +98,10 @@ const BeatShopApp: React.FC = () => {
             {/* Toggle Button - On left edge of panel */}
             <button
               onClick={toggleAIPanel}
-              className="absolute top-1/2 -translate-y-1/2 -left-6 z-10 w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-l-lg flex items-center justify-center text-gray-300 hover:text-white transition-all"
+              className="absolute top-1/2 -translate-y-1/2 -left-5 z-10 w-5 h-14 bg-gradient-to-r from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] border border-[var(--fl-panel-border)] shadow-[0_2px_6px_rgba(0,0,0,0.5)] rounded-l flex items-center justify-center text-[var(--fl-text-dim)] hover:text-white transition-all duration-300"
               title="Hide AI Panel"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={14} />
             </button>
           </aside>
         )}
@@ -110,10 +110,10 @@ const BeatShopApp: React.FC = () => {
         {!isAIPanelOpen && (
           <button
             onClick={toggleAIPanel}
-            className="w-6 h-16 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 border-2 border-gray-900/50 shadow-lg rounded-r-lg flex items-center justify-center text-gray-300 hover:text-white transition-all self-center"
+            className="w-5 h-14 bg-gradient-to-l from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] border border-[var(--fl-panel-border)] shadow-[0_2px_6px_rgba(0,0,0,0.5)] rounded-r flex items-center justify-center text-[var(--fl-text-dim)] hover:text-white transition-all duration-300 self-center"
             title="Show AI Panel"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={14} />
           </button>
         )}
       </div>
@@ -135,22 +135,22 @@ const BeatShopApp: React.FC = () => {
 const PreferencesModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-gradient-to-br from-[#2A2A2A] to-[#1F1F1F] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.8)] border-2 border-gray-800/50 w-full max-w-2xl max-h-[80vh] overflow-hidden">
+      <div className="bg-[var(--fl-panel-bg)] rounded-sm shadow-[0_8px_32px_rgba(0,0,0,0.8)] border border-[var(--fl-panel-border)] w-full max-w-2xl max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 border-b-2 border-gray-900/50">
-          <h2 className="text-xl font-bold text-gray-200">Preferences</h2>
+        <div className="fl-panel-header px-4 py-3 h-auto border-b border-[var(--fl-panel-border)]">
+          <h2 className="text-sm font-bold text-[var(--fl-text-primary)]">Preferences</h2>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+        <div className="p-5 overflow-y-auto max-h-[calc(80vh-140px)]">
           <PreferencesContent />
         </div>
 
         {/* Footer */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 border-t-2 border-gray-900/50 flex justify-end gap-3">
+        <div className="bg-[var(--fl-panel-darker)] px-4 py-3 border-t border-[var(--fl-panel-border)] flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 rounded-lg font-bold text-white shadow-lg transition-all"
+            className="px-5 py-1.5 bg-gradient-to-b from-[var(--fl-panel-medium)] to-[#000000b0] shadow-[inset_0_0_0_0.5px_#00000090] text-[var(--fl-text-primary)] text-xs font-bold hover:text-white transition-all duration-300"
           >
             Close
           </button>

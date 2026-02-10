@@ -113,7 +113,7 @@ export const StepPropertiesPanel: React.FC<StepPropertiesPanelProps> = ({
           type="range"
           min="0" max="100" value={velocity}
           onChange={(e) => handleVelocityChange(Number(e.target.value))}
-          className="w-full h-1.5 accent-purple-500"
+          className="w-full h-1.5 accent-amber-500"
         />
       </div>
 

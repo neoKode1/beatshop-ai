@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { getTrackTypeFromSample } from '@/hooks/useDragDrop';
 import {
   RotateCcw, RotateCw, Grid, Shuffle, Trash2,
-  ChevronRight, ArrowLeftRight
+  ArrowLeftRight, Music
 } from 'lucide-react';
 import WaveformPreview from './WaveformPreview';
 
@@ -20,8 +20,11 @@ interface PadContextMenuProps {
 const PadContextMenu: React.FC<PadContextMenuProps> = ({ padIndex, position, onClose }) => {
   const {
     fillSteps, fillAllSteps, clearPadSteps,
-    rotateSteps, reverseSteps, randomizeSteps
+    rotateSteps, reverseSteps, randomizeSteps,
+    clearPadSample, pads
   } = useBeatStore();
+
+  const hasSample = pads[padIndex]?.sample !== null;
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -51,6 +54,7 @@ const PadContextMenu: React.FC<PadContextMenuProps> = ({ padIndex, position, onC
     { label: 'Randomize 50%', icon: <Shuffle size={12} />, action: () => { randomizeSteps(padIndex, 0.5); console.log(`🎲 Pad ${padIndex + 1}: Randomized at 50% density`); } },
     { divider: true },
     { label: 'Clear Steps', icon: <Trash2 size={12} />, action: () => { clearPadSteps(padIndex); console.log(`🗑️ Pad ${padIndex + 1}: All steps cleared`); }, danger: true },
+    ...(hasSample ? [{ label: 'Remove Sample', icon: <Trash2 size={12} />, action: () => { clearPadSample(padIndex); console.log(`🗑️ Pad ${padIndex + 1}: Sample removed`); }, danger: true }] : []),
   ];
   // Note: Per-step probability and microtiming are set via the StepPropertiesPanel (right-click on individual step)
 
@@ -85,6 +89,14 @@ const PadContextMenu: React.FC<PadContextMenuProps> = ({ padIndex, position, onC
   );
 };
 
+// Chromatic scale notes for 16 pads (C2 to D#3)
+const CHROMATIC_NOTE_LABELS = [
+  'C2', 'C#2', 'D2', 'D#2',
+  'E2', 'F2', 'F#2', 'G2',
+  'G#2', 'A2', 'A#2', 'B2',
+  'C3', 'C#3', 'D3', 'D#3'
+];
+
 const PadGrid: React.FC = () => {
   const {
     // Track system (new)
@@ -98,6 +110,7 @@ const PadGrid: React.FC = () => {
     triggerPad,
     assignSampleToPad,
     padMode,
+    setPadMode,
     setSelectedPadIndex,
     selectedPadIndex,
     isRecording,
@@ -105,6 +118,8 @@ const PadGrid: React.FC = () => {
     isPlaying,
     currentStep,
     toggleStep,
+    // Piano Roll recording (FL Studio style - shows notes in Pattern Builder)
+    recordNoteWithQuantize,
     // MPC features
     noteRepeatEnabled,
     noteRepeatRate,
@@ -161,8 +176,8 @@ const PadGrid: React.FC = () => {
     const velocity = getEffectiveVelocity(padIndex, 100);
     const trackId = padToTrackMap.get(padIndex);
 
-    // Get pad pitch for score logger (convert pad index to MIDI note)
-    const basePitch = 36 + padIndex; // C2 = 36, typical drum pad start
+    // Get pad pitch for score logger and piano roll (convert pad index to MIDI note)
+    const midiPitch = padToMidiPitch(padIndex);
     const msPerBeat = 60000 / bpm;
     const sixteenthDuration = msPerBeat / 4; // Duration of a 16th note in ms
 
@@ -171,24 +186,44 @@ const PadGrid: React.FC = () => {
       if (track) {
         triggerTrack(trackId, undefined, velocity / 127);
         if (isRecording && isPlaying && !isCountingIn && track.type === 'drum') {
+          // Record to step sequencer (for playback)
           addStepToTrack(trackId, currentStep, velocity / 127);
+
+          // 🎹 ALSO record to Piano Roll (Pattern Builder) so user sees the pattern
+          console.log(`🔴 [PadGrid] Recording at step ${currentStep} (bar ${Math.floor(currentStep / 16) + 1}, beat ${Math.floor((currentStep % 16) / 4) + 1})`);
+          recordNoteWithQuantize({
+            pitch: midiPitch,
+            startTime: currentStep,
+            duration: 1,
+            velocity: velocity / 127,
+          });
         }
       }
     } else {
       triggerPad(padIndex, velocity / 127);
       if (isRecording && isPlaying && !isCountingIn) {
+        // Record to step sequencer (for playback)
         toggleStep(padIndex, currentStep);
+
+        // 🎹 ALSO record to Piano Roll (Pattern Builder) so user sees the pattern
+        console.log(`🔴 [PadGrid] Recording at step ${currentStep} (bar ${Math.floor(currentStep / 16) + 1}, beat ${Math.floor((currentStep % 16) / 4) + 1})`);
+        recordNoteWithQuantize({
+          pitch: midiPitch,
+          startTime: currentStep,
+          duration: 1,
+          velocity: velocity / 127,
+        });
       }
     }
 
     // 📝 Score Logger: Always add pad hits to 3-minute buffer (FL Studio behavior)
     addNoteToScoreLog({
-      pitch: basePitch,
+      pitch: midiPitch,
       velocity: velocity / 127,
       startTime: Date.now(),
       duration: sixteenthDuration, // Drum hits are typically 1 16th note
     });
-    console.log(`📝 Score Logger: Pad ${padIndex + 1} added to buffer (pitch: ${basePitch})`);
+    console.log(`📝 Score Logger: Pad ${padIndex + 1} added to buffer (pitch: ${midiPitch})`);
 
     // Visual feedback
     setActivePads(prev => new Set(prev).add(padIndex));
@@ -199,7 +234,7 @@ const PadGrid: React.FC = () => {
         return next;
       });
     }, 100);
-  }, [getEffectiveVelocity, padToTrackMap, tracks, triggerTrack, triggerPad, isRecording, isPlaying, isCountingIn, addStepToTrack, currentStep, toggleStep, bpm, addNoteToScoreLog]);
+  }, [getEffectiveVelocity, padToTrackMap, tracks, triggerTrack, triggerPad, isRecording, isPlaying, isCountingIn, addStepToTrack, currentStep, toggleStep, bpm, addNoteToScoreLog, recordNoteWithQuantize]);
 
   // Start note repeat for a pad
   const startNoteRepeat = useCallback((padIndex: number) => {
@@ -328,8 +363,30 @@ const PadGrid: React.FC = () => {
     };
   }, []);
 
+  // Helper: Convert pad index to MIDI pitch (FL Studio drum mapping)
+  // Standard GM drum mapping: C1 (36) = Kick, D1 (38) = Snare, etc.
+  const padToMidiPitch = (padIndex: number): number => {
+    // 4x4 grid mapped to standard drum pitches starting at C2 (MIDI 36)
+    // Row 1 (bottom): Kick, Snare, HiHat Closed, HiHat Open
+    // Row 2: Clap, Rimshot, Tom Low, Tom Mid
+    // Row 3: Tom High, Crash, Ride, Perc 1
+    // Row 4 (top): Perc 2, Perc 3, Perc 4, FX
+    const drumPitches = [
+      36, 38, 42, 46,  // C2, D2, F#2, A#2 (Kick, Snare, HH Closed, HH Open)
+      39, 37, 41, 43,  // D#2, C#2, F2, G2 (Clap, Rim, Tom Low, Tom Mid)
+      45, 49, 51, 56,  // A2, C#3, D#3, G#3 (Tom Hi, Crash, Ride, Cowbell)
+      54, 69, 70, 75,  // F#3, A4, A#4, D#5 (Tambourine, Cabasa, Maracas, Claves)
+    ];
+    return drumPitches[padIndex] ?? (36 + padIndex);
+  };
+
   // Legacy click handler (for backward compatibility)
   const handlePadClick = (padIndex: number) => {
+    console.log(`🥁 [PadGrid] Pad ${padIndex} clicked`, {
+      isRecording, isPlaying, isCountingIn, currentStep,
+      noteRepeatEnabled, padMuteMode, eraseMode,
+    });
+
     // Only handle if not using mousedown/up for note repeat
     if (!noteRepeatEnabled && !padMuteMode && !eraseMode) {
       // Check if this pad has a track
@@ -342,10 +399,27 @@ const PadGrid: React.FC = () => {
           triggerTrack(trackId);
           setSelectedTrackId(trackId);
 
-          // 🎙️ LIVE RECORDING: If recording and playing (and NOT counting in), add hit to current step
+          // 🎙️ LIVE RECORDING: If recording and playing (and NOT counting in), record the hit
           if (isRecording && isPlaying && !isCountingIn && track.type === 'drum') {
+            // Record to step sequencer (for playback)
             addStepToTrack(trackId, currentStep, 0.8);
-            console.log(`🔴 Recorded track ${trackId} at step ${currentStep + 1}`);
+
+            // 🎹 ALSO record to Piano Roll (Pattern Builder) so user sees the pattern
+            // This is the FL Studio behavior - notes appear in the pattern view
+            const midiPitch = padToMidiPitch(padIndex);
+            recordNoteWithQuantize({
+              pitch: midiPitch,
+              startTime: currentStep,
+              duration: 1, // 1 sixteenth note for drum hits
+              velocity: 0.8,
+            });
+
+            console.log(`🔴 [PadGrid] RECORDED track ${trackId} at step ${currentStep + 1} (MIDI pitch ${midiPitch})`);
+          } else {
+            console.log(`ℹ️ [PadGrid] NOT recording - conditions:`, {
+              isRecording, isPlaying, isCountingIn, trackType: track.type,
+              shouldRecord: isRecording && isPlaying && !isCountingIn && track.type === 'drum'
+            });
           }
         }
       } else {
@@ -353,10 +427,26 @@ const PadGrid: React.FC = () => {
         triggerPad(padIndex);
         setSelectedPadIndex(padIndex);
 
-        // 🎙️ LIVE RECORDING: If recording and playing (and NOT counting in), add hit to current step
+        // 🎙️ LIVE RECORDING: If recording and playing (and NOT counting in), record the hit
         if (isRecording && isPlaying && !isCountingIn) {
+          // Record to step sequencer (for playback)
           toggleStep(padIndex, currentStep);
-          console.log(`🔴 Recorded pad ${padIndex} at step ${currentStep + 1}`);
+
+          // 🎹 ALSO record to Piano Roll (Pattern Builder) so user sees the pattern
+          const midiPitch = padToMidiPitch(padIndex);
+          recordNoteWithQuantize({
+            pitch: midiPitch,
+            startTime: currentStep,
+            duration: 1, // 1 sixteenth note for drum hits
+            velocity: 0.8,
+          });
+
+          console.log(`🔴 [PadGrid] RECORDED pad ${padIndex} at step ${currentStep + 1} (MIDI pitch ${midiPitch})`);
+        } else {
+          console.log(`ℹ️ [PadGrid] NOT recording (legacy) - conditions:`, {
+            isRecording, isPlaying, isCountingIn,
+            shouldRecord: isRecording && isPlaying && !isCountingIn
+          });
         }
       }
 
@@ -414,6 +504,7 @@ const PadGrid: React.FC = () => {
   }, [addTrack, assignSampleToPad]);
 
   // Keyboard mapping (Q-P for top row, A-; for second row, etc.)
+  // Uses handlePadMouseDown for proper recording support
   useEffect(() => {
     const keyMap: { [key: string]: number } = {
       'q': 0, 'w': 1, 'e': 2, 'r': 3,
@@ -423,54 +514,23 @@ const PadGrid: React.FC = () => {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      // Don't trigger pads when modifier keys are held (Ctrl+Q = quantize, not pad 0)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       const padIndex = keyMap[e.key.toLowerCase()];
       if (padIndex !== undefined && !activePads.has(padIndex)) {
-        handlePadClick(padIndex);
+        // Use handlePadMouseDown for proper recording support
+        handlePadMouseDown(padIndex);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePads]);
-
-  const getPadColor = (padIndex: number) => {
-    const pad = pads[padIndex];
-    // Lighter gray pads on dark background
-    if (!pad.sample) return 'bg-gradient-to-br from-gray-500 to-gray-600';
-
-    // Subtle color tint when sample is loaded
-    const categoryColors: { [key: string]: string } = {
-      kick: 'bg-gradient-to-br from-red-600 to-red-700',
-      snare: 'bg-gradient-to-br from-blue-600 to-blue-700',
-      hihat: 'bg-gradient-to-br from-yellow-600 to-yellow-700',
-      perc: 'bg-gradient-to-br from-green-600 to-green-700',
-      bass: 'bg-gradient-to-br from-purple-600 to-purple-700',
-      synth: 'bg-gradient-to-br from-pink-600 to-pink-700',
-      fx: 'bg-gradient-to-br from-cyan-600 to-cyan-700',
-      melodic: 'bg-gradient-to-br from-indigo-600 to-indigo-700',
-    };
-
-    return categoryColors[pad.sample.category] || 'bg-gradient-to-br from-gray-500 to-gray-600';
-  };
-
-  const getPadActiveColor = (padIndex: number) => {
-    const pad = pads[padIndex];
-    if (!pad.sample) return 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-inner';
-
-    // Brighter when active
-    const categoryColors: { [key: string]: string } = {
-      kick: 'bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/50',
-      snare: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/50',
-      hihat: 'bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-lg shadow-yellow-500/50',
-      perc: 'bg-gradient-to-br from-green-500 to-green-600 shadow-lg shadow-green-500/50',
-      bass: 'bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg shadow-purple-500/50',
-      synth: 'bg-gradient-to-br from-pink-500 to-pink-600 shadow-lg shadow-pink-500/50',
-      fx: 'bg-gradient-to-br from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/50',
-      melodic: 'bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-500/50',
-    };
-
-    return categoryColors[pad.sample.category] || 'bg-gradient-to-br from-gray-400 to-gray-500 shadow-inner';
-  };
+  }, [activePads, handlePadMouseDown]);
 
   // MPC Studio pad border colors (matches the real hardware)
   const mpcPadBorderColors = [
@@ -489,7 +549,7 @@ const PadGrid: React.FC = () => {
   ];
 
   return (
-    <div className="pad-grid w-full h-full">
+    <div className="pad-grid w-full h-full flex flex-col min-h-0">
       {/* Context menu for Fill Steps / Rotate Steps */}
       {contextMenu && (
         <PadContextMenu
@@ -499,7 +559,26 @@ const PadGrid: React.FC = () => {
         />
       )}
 
-      <div className="grid grid-cols-4 gap-2 w-full h-full p-3">
+      {/* Mode Toggle Header - Only show when chromatic mode is active */}
+      {padMode === 'chromatic' && (
+        <div className="flex items-center justify-center gap-2 py-1.5 bg-cyan-500/10 border-b border-cyan-500/30">
+          <Music size={12} className="text-cyan-400" />
+          <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+            Chromatic Mode
+          </span>
+          <span className="text-[9px] text-cyan-400/70">
+            • All pads play same sample at different pitches (C2-D#3)
+          </span>
+          <button
+            onClick={() => setPadMode('drum')}
+            className="ml-2 px-2 py-0.5 text-[9px] font-medium text-cyan-400 bg-cyan-500/20 rounded hover:bg-cyan-500/30 transition-colors"
+          >
+            Switch to Drum Mode
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 grid-rows-4 gap-2 w-full flex-1 min-h-0 p-3">
         {pads.map((pad, index) => {
           const borderColor = mpcPadBorderColors[index] || '#666';
           const funcLabel = mpcPadLabels[index];
@@ -518,7 +597,7 @@ const PadGrid: React.FC = () => {
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, index)}
               className={`
-                relative rounded-md
+                relative rounded-md w-full h-full
                 flex flex-col items-center justify-center
                 transition-all duration-75
                 ${activePads.has(index) || heldPads.has(index) ? 'scale-95' : 'hover:scale-[1.02]'}
@@ -562,8 +641,15 @@ const PadGrid: React.FC = () => {
                   <span className="text-gray-500">—</span>
                 )}
               </div>
+              {/* Chromatic Note indicator - shows note name when in chromatic mode */}
+              {padMode === 'chromatic' && (
+                <div className="text-[9px] font-bold text-cyan-400 mt-0.5 flex items-center gap-1">
+                  <span className="text-[6px]">♪</span>
+                  {CHROMATIC_NOTE_LABELS[index]}
+                </div>
+              )}
               {/* Waveform Preview - shows when sample is loaded */}
-              {pad.sample && (
+              {pad.sample?.url && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
                   <WaveformPreview
                     sampleUrl={pad.sample.url}

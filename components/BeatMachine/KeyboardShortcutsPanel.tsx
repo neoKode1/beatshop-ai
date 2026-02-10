@@ -18,18 +18,21 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Transport Controls',
     color: 'green',
     shortcuts: [
-      { keys: 'Space', description: 'Play / Pause' },
+      { keys: 'Space', description: 'Play / Stop + Rewind' },
+      { keys: 'Ctrl + Space', description: 'Pause (keep position)' },
       { keys: 'R', description: 'Arm / Disarm Recording' },
+      { keys: 'L', description: 'Toggle PAT / SONG Mode' },
       { keys: 'Escape', description: 'Cancel Recording (revert)' },
       { keys: 'Ctrl + M', description: 'Toggle Metronome' },
       { keys: 'Ctrl + P', description: 'Toggle Count-in' },
       { keys: 'Ctrl + B', description: 'Toggle Blend Recording (Overdub)' },
       { keys: 'Ctrl + I', description: 'Toggle Wait for Input' },
+      { keys: 'Ctrl + T', description: 'Typing Keyboard to Piano (MIDI toggle)' },
     ],
   },
   {
     title: 'Piano Roll Tools',
-    color: 'purple',
+    color: 'amber',
     shortcuts: [
       { keys: 'P', description: 'Draw Tool (Pencil)' },
       { keys: 'B', description: 'Paint Tool (Brush)' },
@@ -80,7 +83,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 
 const colorClasses: Record<string, { bg: string; border: string; text: string }> = {
   green: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400' },
-  purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400' },
+  amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400' },
   blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400' },
   orange: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400' },
   red: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400' },
@@ -104,7 +107,7 @@ export const KeyboardShortcutsPanel: React.FC<KeyboardShortcutsPanelProps> = ({ 
         {/* Header */}
         <div className="p-4 border-b-2 border-gray-800/50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <Keyboard size={24} className="text-purple-400" />
+            <Keyboard size={24} className="text-amber-400" />
             <div>
               <h2 className="text-xl font-bold text-gray-200">Keyboard Shortcuts</h2>
               <p className="text-xs text-gray-500">Press ? or F1 to open this panel</p>

@@ -281,7 +281,7 @@ export function createAudioBuffer(
   );
 
   for (let i = 0; i < channelData.length; i++) {
-    buffer.copyToChannel(channelData[i], i);
+    buffer.copyToChannel(new Float32Array(channelData[i]), i);
   }
 
   return buffer;

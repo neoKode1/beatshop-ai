@@ -62,19 +62,19 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
       tracks: store.tracks,
       midiNotes: store.midiNotes,
       masterSettings: {
-        masterVolume: store.masterVolume,
-        compressorThreshold: store.compressorThreshold,
-        compressorRatio: store.compressorRatio,
-        compressorAttack: store.compressorAttack,
-        compressorRelease: store.compressorRelease,
-        limiterThreshold: store.limiterThreshold,
-        eqLow: store.eqLow,
-        eqMid: store.eqMid,
-        eqHigh: store.eqHigh,
-        distortion: store.distortion,
-        reverb: store.reverb,
-        delay: store.delay,
-        stereoWidth: store.stereoWidth,
+        masterVolume: store.masterEffects.volume,
+        compressorThreshold: store.masterEffects.compressorThreshold,
+        compressorRatio: store.masterEffects.compressorRatio,
+        compressorAttack: store.masterEffects.compressorAttack,
+        compressorRelease: store.masterEffects.compressorRelease,
+        limiterThreshold: store.masterEffects.limiterThreshold,
+        eqLow: store.masterEffects.eqLow,
+        eqMid: store.masterEffects.eqMid,
+        eqHigh: store.masterEffects.eqHigh,
+        distortion: store.masterEffects.distortion,
+        reverb: store.masterEffects.reverb,
+        delay: store.masterEffects.delay,
+        stereoWidth: store.masterEffects.stereoWidth,
         swing: store.swing,
         patternLength: store.patternLength,
       },
@@ -209,7 +209,7 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
           </button>
           <button
             onClick={importProject}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold text-white transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold text-white transition-all"
           >
             <Upload size={18} />
             Import
@@ -231,7 +231,7 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
               {savedProjects.map(project => (
                 <div
                   key={project.id}
-                  className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50 hover:border-purple-500/50 transition-all"
+                  className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50 hover:border-amber-500/50 transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -280,7 +280,7 @@ export const ProjectManager: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="Enter project name..."
-                className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+                className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 mb-4"
                 autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && saveProject()}
               />

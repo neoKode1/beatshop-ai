@@ -387,7 +387,7 @@ const Toolbar: React.FC = () => {
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-            showAdvanced ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            showAdvanced ? 'bg-amber-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
           }`}
           title="Advanced Controls"
         >
@@ -429,7 +429,7 @@ const Toolbar: React.FC = () => {
               type="range"
               value={swing}
               onChange={(e) => setSwing(parseFloat(e.target.value))}
-              className="w-20 h-1 accent-purple-500"
+              className="w-20 h-1 accent-amber-500"
               min="0"
               max="1"
               step="0.01"
@@ -455,7 +455,7 @@ const Toolbar: React.FC = () => {
           <button
             onClick={toggleBlendRecording}
             className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-              blendRecording ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              blendRecording ? 'bg-amber-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
             title={blendRecording
               ? 'Blend Recording: ON (new notes merge with existing - overdub)'

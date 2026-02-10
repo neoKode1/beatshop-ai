@@ -18,7 +18,7 @@ import VolumeMeter from '../VolumeMeter/VolumeMeter';
 import AudioExport from '../AudioExport/AudioExport';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import MIDILearnPanel from './MIDILearnPanel';
-import { Sliders, Piano, Music, Disc, ListMusic, Download, HelpCircle, Settings } from 'lucide-react';
+import { Sliders, Piano, Music, Disc, ListMusic, Download, HelpCircle, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Layout modes for the workspace
 type LayoutMode = 'drumpad' | 'keys' | 'sequencer' | 'song' | 'mixer';
@@ -29,6 +29,7 @@ const BeatMachine: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
   const [showMIDILearnPanel, setShowMIDILearnPanel] = useState(false);
+  const [samplerCollapsed, setSamplerCollapsed] = useState(true);
   const { selectedPadIndex, pads } = useBeatStore();
 
   // Get the selected pad to check if it has a sample
@@ -76,75 +77,75 @@ const BeatMachine: React.FC = () => {
         <MIDILearnPanel onClose={() => setShowMIDILearnPanel(false)} />
       )}
 
-      {/* Layout Tab Navigation - FL Studio Style */}
-      <div className="flex gap-1 mb-4 bg-gray-800/30 p-1 rounded-lg border border-gray-700/30 w-fit">
+      {/* Layout Tab Navigation - FL Studio Window Toolbar Style */}
+      <div className="flex gap-0 mb-3 bg-[var(--fl-panel-bg)] border border-[var(--fl-panel-border)] w-fit shadow-[inset_0_0_0_1px_#00000040]">
         {/* Drum Pad */}
         <button
           onClick={() => setLayoutMode('drumpad')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] ${
             layoutMode === 'drumpad'
-              ? 'bg-orange-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              ? 'bg-gradient-to-b from-[var(--fl-accent-orange)] to-[#cc5500] text-white shadow-[inset_0_0_8px_rgba(255,107,0,0.4)]'
+              : 'bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-white hover:bg-[var(--fl-panel-light)]'
           }`}
         >
-          <Disc size={14} />
+          <Disc size={12} />
           <span>Drum Pad</span>
         </button>
 
         {/* Keys */}
         <button
           onClick={() => setLayoutMode('keys')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] ${
             layoutMode === 'keys'
-              ? 'bg-orange-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              ? 'bg-gradient-to-b from-[var(--fl-accent-orange)] to-[#cc5500] text-white shadow-[inset_0_0_8px_rgba(255,107,0,0.4)]'
+              : 'bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-white hover:bg-[var(--fl-panel-light)]'
           }`}
         >
-          <Piano size={14} />
+          <Piano size={12} />
           <span>Keys</span>
         </button>
 
         {/* Sequencer */}
         <button
           onClick={() => setLayoutMode('sequencer')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] ${
             layoutMode === 'sequencer'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              ? 'bg-gradient-to-b from-[var(--fl-accent-blue)] to-[#2a6abf] text-white shadow-[inset_0_0_8px_rgba(74,158,255,0.4)]'
+              : 'bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-white hover:bg-[var(--fl-panel-light)]'
           }`}
         >
-          <ListMusic size={14} />
+          <ListMusic size={12} />
           <span>Sequencer</span>
         </button>
 
         {/* Song Mode */}
         <button
           onClick={() => setLayoutMode('song')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] ${
             layoutMode === 'song'
-              ? 'bg-purple-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              ? 'bg-gradient-to-b from-[var(--fl-accent-amber)] to-[#c07f00] text-white shadow-[inset_0_0_8px_rgba(245,166,35,0.4)]'
+              : 'bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-white hover:bg-[var(--fl-panel-light)]'
           }`}
         >
-          <Music size={14} />
+          <Music size={12} />
           <span>Song Mode</span>
         </button>
 
         {/* Mixer */}
         <button
           onClick={() => setLayoutMode('mixer')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] ${
             layoutMode === 'mixer'
-              ? 'bg-green-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+              ? 'bg-gradient-to-b from-[#00cc44] to-[#009933] text-white shadow-[inset_0_0_8px_rgba(0,204,68,0.4)]'
+              : 'bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-white hover:bg-[var(--fl-panel-light)]'
           }`}
         >
-          <Sliders size={14} />
+          <Sliders size={12} />
           <span>Mixer</span>
         </button>
 
         {/* Separator */}
-        <div className="w-px bg-gray-600 mx-1" />
+        <div className="w-px bg-gradient-to-b from-transparent via-[var(--fl-panel-border-light)] to-transparent mx-0" />
 
         {/* Export Button */}
         <button
@@ -152,10 +153,10 @@ const BeatMachine: React.FC = () => {
             setShowExportModal(true);
             console.log('📤 Opening export dialog', { currentMode: layoutMode });
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition-all text-gray-400 hover:text-green-400 hover:bg-green-600/20"
+          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-[var(--fl-accent-green)] hover:bg-[var(--fl-panel-light)]"
           title="Export Audio (Ctrl+Shift+E)"
         >
-          <Download size={14} />
+          <Download size={12} />
           <span>Export</span>
         </button>
 
@@ -165,10 +166,10 @@ const BeatMachine: React.FC = () => {
             setShowMIDILearnPanel(true);
             console.log('🎹 MIDI Learn panel opened');
           }}
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-semibold transition-all text-gray-400 hover:text-orange-400 hover:bg-orange-600/20"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold transition-all duration-300 border-r border-[var(--fl-panel-border)] bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-[var(--fl-accent-orange)] hover:bg-[var(--fl-panel-light)]"
           title="MIDI Learn"
         >
-          <Settings size={14} />
+          <Settings size={12} />
         </button>
 
         {/* Help Button - Keyboard Shortcuts */}
@@ -177,10 +178,10 @@ const BeatMachine: React.FC = () => {
             setShowShortcutsPanel(true);
             console.log('⌨️ Keyboard Shortcuts panel opened via button');
           }}
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-semibold transition-all text-gray-400 hover:text-purple-400 hover:bg-purple-600/20"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold transition-all duration-300 bg-gradient-to-b from-[var(--fl-panel-medium)] to-[var(--fl-panel-bg)] text-[var(--fl-text-secondary)] hover:text-[var(--fl-accent-amber)] hover:bg-[var(--fl-panel-light)]"
           title="Keyboard Shortcuts (? or F1)"
         >
-          <HelpCircle size={14} />
+          <HelpCircle size={12} />
         </button>
       </div>
 
@@ -215,11 +216,9 @@ const BeatMachine: React.FC = () => {
           <div
             className="flex-1 min-h-0"
             style={{
-              background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
-              borderRadius: '12px',
+              background: 'var(--fl-panel-darker)',
               overflow: 'hidden',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-              border: '1px solid #333',
+              border: '1px solid var(--fl-panel-border)',
             }}
           >
             <PianoRoll />
@@ -247,11 +246,9 @@ const BeatMachine: React.FC = () => {
           <div
             className="mt-4 flex-1 min-h-0"
             style={{
-              background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
-              borderRadius: '12px',
+              background: 'var(--fl-panel-darker)',
               overflow: 'hidden',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-              border: '1px solid #333',
+              border: '1px solid var(--fl-panel-border)',
             }}
           >
             <PianoRoll />
@@ -319,9 +316,9 @@ const BeatMachine: React.FC = () => {
                 className="flex-1 flex flex-col gap-2 h-full"
                 style={{ minWidth: '320px' }}
               >
-                {/* Instrument (Pads) */}
+                {/* Instrument (Pads) - Always visible, takes full space */}
                 <div
-                  className="flex-1"
+                  className="flex-1 flex flex-col min-h-0 overflow-hidden"
                   style={{
                     background: 'linear-gradient(180deg, #151515 0%, #0a0a0a 100%)',
                     borderRadius: '8px',
@@ -331,20 +328,6 @@ const BeatMachine: React.FC = () => {
                 >
                   <PadGrid />
                 </div>
-
-                {/* FL Sampler - Show when a pad with sample is selected */}
-                {selectedPadIndex !== null && hasSample && (
-                  <div
-                    style={{
-                      background: 'linear-gradient(180deg, #151515 0%, #0a0a0a 100%)',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
-                    }}
-                  >
-                    <FLSampler />
-                  </div>
-                )}
               </div>
 
               {/* RIGHT PANEL - LCD, Jog Wheel, Sample/Timing Controls */}
@@ -378,15 +361,46 @@ const BeatMachine: React.FC = () => {
 
           </MPCStudioSkin>
 
+          {/* FL Sampler Panel - Collapsible, below pads, above piano roll */}
+          {selectedPadIndex !== null && hasSample && (
+            <div
+              className="mt-2 flex-shrink-0"
+              style={{
+                background: 'linear-gradient(180deg, #151515 0%, #0a0a0a 100%)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                border: '1px solid #333',
+              }}
+            >
+              {/* Collapse/Expand toggle bar */}
+              <button
+                onClick={() => setSamplerCollapsed(!samplerCollapsed)}
+                className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-bold text-gray-400 hover:text-white transition-colors"
+                style={{ background: 'rgba(255,255,255,0.03)' }}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span style={{ color: '#ff6b00' }}>▸</span>
+                  SAMPLER — Pad {selectedPadIndex + 1} • {pads[selectedPadIndex]?.sample?.name || 'Empty'}
+                </span>
+                {samplerCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+              </button>
+              {/* Sampler content - hidden when collapsed */}
+              {!samplerCollapsed && (
+                <div style={{ maxHeight: '220px', overflow: 'auto' }}>
+                  <FLSampler />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Piano Roll / Pattern Builder - Fills remaining screen space */}
           <div
-            className="mt-4 flex-1 min-h-0"
+            className="mt-2 flex-1 min-h-0"
             style={{
-              background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
-              borderRadius: '12px',
+              background: 'var(--fl-panel-darker)',
               overflow: 'hidden',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-              border: '1px solid #333',
+              border: '1px solid var(--fl-panel-border)',
             }}
           >
             <PianoRoll />

@@ -3,14 +3,52 @@
 :root {
   --background: #030712;
   --foreground: #f9fafb;
+
+  /* FL Studio Panel System - adapted to BeashopAI dark theme */
+  --fl-panel-bg: #1a1a1a;
+  --fl-panel-darker: #111111;
+  --fl-panel-medium: #252525;
+  --fl-panel-light: #2e2e2e;
+  --fl-panel-border: #0a0a0aaa;
+  --fl-panel-border-light: #3a3a3a;
+
+  /* FL Studio Toolbar */
+  --fl-toolbar-bg: #1e1e1e;
+  --fl-toolbar-border: #0d0d0d;
+
+  /* FL Studio Button System */
+  --fl-btn-bg: #2a2a2a;
+  --fl-btn-border: #00000069;
+  --fl-btn-shadow: inset 0 0 8px 0 #00000050;
+  --fl-btn-active-border: #ff6b00dd;
+  --fl-btn-active-bg: #ff6b00;
+  --fl-btn-active-glow: inset 0 0 12px #ff6b00;
+
+  /* Accent Colors (BeashopAI brand) */
+  --fl-accent-orange: #ff6b00;
+  --fl-accent-amber: #f5a623;
+  --fl-accent-green: #00ff00;
+  --fl-accent-green-dim: #32ff17;
+  --fl-accent-red: #f8615a;
+  --fl-accent-blue: #4a9eff;
+
+  /* LCD Display */
+  --fl-lcd-bg: #0a0f0a;
+  --fl-lcd-border: #1a2a1a;
+  --fl-lcd-text: #00ff00;
+
+  /* Text */
+  --fl-text-primary: #e0e0e0;
+  --fl-text-secondary: #8a8a8a;
+  --fl-text-dim: #5a5a5a;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Segoe UI', 'Lucida Sans', 'Lucida Grande', -apple-system, BlinkMacSystemFont,
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
 }
 
 @layer utilities {
@@ -92,36 +130,67 @@ input[type="range"]:focus {
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
 }
 
-/* Custom Scrollbar Styling for Dark Theme */
+/* FL Studio Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  background-color: var(--fl-panel-darker);
+  box-shadow: inset 0px 0px 4px 3px rgba(0,0,0,0.3);
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f1f1f;
-  border-radius: 4px;
+  background: var(--fl-panel-darker);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
+  background-color: var(--fl-panel-medium);
+  border: 1px solid #000000aa;
+  box-shadow: inset 0 0 0 1px #4a4a4a60;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background-color: #3a3a3a;
 }
 
 ::-webkit-scrollbar-corner {
-  background: #1f1f1f;
+  background-color: var(--fl-panel-medium);
 }
 
 /* Firefox scrollbar styling */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #1f1f1f;
+  scrollbar-color: var(--fl-panel-medium) var(--fl-panel-darker);
+}
+
+/* FL Studio Panel Classes */
+.fl-panel {
+  background-color: var(--fl-panel-bg);
+  border: 1px solid var(--fl-panel-border);
+  box-shadow: inset 0 0 0 1px var(--fl-panel-border);
+}
+
+.fl-panel-header {
+  height: 22px;
+  background-color: var(--fl-panel-medium);
+  border-bottom: 1px solid var(--fl-panel-border);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--fl-text-secondary);
+  user-select: none;
+}
+
+.fl-inset {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.6), inset 0 0 1px rgba(0,0,0,0.4);
+}
+
+.fl-separator {
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--fl-panel-border-light), transparent);
+  margin: 4px 0;
 }
 

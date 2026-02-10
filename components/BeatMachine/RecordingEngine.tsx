@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useBeatStore, MidiNote } from '@/store/useBeatStore';
 import * as Tone from 'tone';
 
 /**
  * RecordingEngine - Professional MIDI recording system
- * 
- * Features:
- * - Count-in (4 beats with metronome)
- * - Real-time MIDI capture from keyboard/MIDI devices
- * - Visual feedback during recording
- * - Automatic quantization to grid
- * - Pattern creation from recorded notes
+ *
+ * NOTE: Count-in and metronome are handled EXCLUSIVELY by FLToolbar.
+ * This component only handles:
+ * - Recording session management (start/stop/commit)
+ * - MIDI note capture from keyboard/MIDI devices
+ * - Note quantization
+ *
+ * FL Studio workflow: Arm → Play → Count-in (FLToolbar) → Record
  */
 
 interface RecordingEngineProps {
@@ -22,13 +23,8 @@ interface RecordingEngineProps {
 export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingComplete }) => {
   const {
     isRecording,
-    setIsRecording,
     isPlaying,
-    setIsPlaying,
     bpm,
-    metronomeEnabled,
-    metronomeVolume,
-    addMidiNote,
     clearMidiNotes,
     // Recording Session Actions
     startRecordingSession,
@@ -40,21 +36,28 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     inputQuantize,
     blendRecording,
     selectedTrackId,
-    tracks,
     // Score Logger
     addNoteToScoreLog,
+    // Count-in state from store (FL Studio style - single source of truth)
+    // NOTE: Count-in is handled by FLToolbar, we just read the state
+    isCountingIn,
+    countInStep,
+    timeSignature,
+    // Recording Timing Sync
+    recordingDownbeatTime,
   } = useBeatStore();
 
-  const [countIn, setCountIn] = useState(0); // 0 = not counting, 1-4 = count beats
-  const [isCountingIn, setIsCountingIn] = useState(false);
+  // Derive beatsPerMeasure from timeSignature (e.g., '4/4' → 4, '3/4' → 3, '6/8' → 6)
+  const beatsPerMeasure = parseInt(timeSignature.split('/')[0], 10) || 4;
+
   const recordingStartTimeRef = useRef<number>(0);
   const recordedNotesRef = useRef<MidiNote[]>([]);
-  const metronomeRef = useRef<Tone.Synth | null>(null);
   const activeNotesRef = useRef<Map<string, { startTime: number; pitch: number }>>(new Map());
 
   // Use refs to track recording state for callbacks
   const isRecordingRef = useRef(false);
   const isCountingInRef = useRef(false);
+  const recordingSessionStartedRef = useRef(false);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -65,123 +68,50 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     isCountingInRef.current = isCountingIn;
   }, [isCountingIn]);
 
-  // Initialize metronome
+  // When count-in ends (isCountingIn goes from true to false while recording),
+  // start the actual recording session
   useEffect(() => {
-    if (!metronomeRef.current) {
-      metronomeRef.current = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.05,
-          sustain: 0,
-          release: 0.05,
-        },
-      }).toDestination();
-    }
+    if (isRecording && !isCountingIn && !recordingSessionStartedRef.current) {
+      // Count-in just finished, start recording session
+      console.log('🎬 [RecordingEngine] Count-in complete - Starting recording session');
+      recordingSessionStartedRef.current = true;
+      startRecordingSession();
+      recordingStartTimeRef.current = recordingDownbeatTime;
+      recordedNotesRef.current = [];
+      console.log(`🎬 [RecordingEngine] Recording start time set to downbeat: ${recordingDownbeatTime.toFixed(3)}s`);
 
-    return () => {
-      if (metronomeRef.current) {
-        metronomeRef.current.dispose();
-        metronomeRef.current = null;
+      // Only clear notes if NOT in blend (overdub) mode
+      if (!blendRecording) {
+        clearMidiNotes();
+        console.log('🗑️ [RecordingEngine] Cleared existing notes (overwrite mode)');
+      } else {
+        console.log('➕ [RecordingEngine] Blend mode active - keeping existing notes');
       }
-    };
-  }, []);
 
-  // Start count-in when recording is armed
+      console.log('🔴 [RecordingEngine] RECORDING ACTIVE - Play pads now!');
+    }
+  }, [isRecording, isCountingIn, blendRecording, clearMidiNotes, startRecordingSession]);
+
+  // Reset recording session flag when recording stops
   useEffect(() => {
-    if (isRecording && !isCountingIn && !isPlaying) {
-      startCountIn();
+    if (!isRecording) {
+      recordingSessionStartedRef.current = false;
     }
   }, [isRecording]);
 
-  const startCountIn = async () => {
-    await Tone.start();
-    setIsCountingIn(true);
-    setCountIn(1);
-    console.log('🎬 COUNT-IN STARTED at', bpm, 'BPM');
-
-    const beatDuration = (60 / bpm) * 1000; // Duration of one beat in ms
-
-    // Count in 4 beats
-    for (let i = 1; i <= 4; i++) {
-      setTimeout(() => {
-        setCountIn(i);
-        console.log(`⏱️ Count-in: ${i}/4`);
-
-        // Play metronome click
-        if (metronomeRef.current && (metronomeEnabled || isRecording)) {
-          const pitch = i === 1 ? 'C6' : 'C5'; // Higher pitch on beat 1
-          const volume = Tone.gainToDb(metronomeVolume);
-          metronomeRef.current.volume.value = volume;
-          metronomeRef.current.triggerAttackRelease(pitch, '32n');
-        }
-
-        // Start recording on beat 5 (the downbeat after the count-in)
-        if (i === 4) {
-          // Wait one full beat after beat 4, so recording starts on beat 5 (the "1")
-          setTimeout(() => {
-            setIsCountingIn(false);
-            setCountIn(0);
-            console.log('🎬 Count-in complete - RECORDING STARTS NOW!');
-            startRecording();
-          }, beatDuration); // Full beat duration to land on beat 5
-        }
-      }, (i - 1) * beatDuration);
-    }
-  };
-
-  const startRecording = () => {
-    recordingStartTimeRef.current = Tone.now();
-    recordedNotesRef.current = [];
-
-    console.log('🔴 RECORDING STARTED', {
-      bpm,
-      blendMode: blendRecording ? 'OVERDUB (keeping existing notes)' : 'OVERWRITE (clearing notes)',
-      targetTrack: selectedTrackId || 'Piano Roll (no track selected)',
-      recordToStepSeq: inputQuantize.recordToStepSequencer,
-    });
-
-    // Start recording session (snapshot current state for cancel/revert)
-    startRecordingSession();
-
-    // Only clear notes if NOT in blend (overdub) mode
-    if (!blendRecording) {
-      clearMidiNotes();
-      console.log('🗑️ Cleared existing notes (overwrite mode)');
-    } else {
-      console.log('➕ Blend mode active - keeping existing notes');
-    }
-
-    setIsPlaying(true);
-
-    // Reset transport position to 0 before starting
-    // This ensures recording always starts at step 0, not at a previous position
-    Tone.getTransport().stop();
-    Tone.getTransport().position = 0;
-
-    // Start transport for timing reference
-    Tone.getTransport().start();
-    console.log('▶️ Transport started - Play notes now!');
-  };
-
   const stopRecording = () => {
     const notes = recordedNotesRef.current;
-    console.log('⏹️ RECORDING STOPPED', {
+    console.log('⏹️ [RecordingEngine] RECORDING STOPPED', {
       notesRecorded: notes.length,
       notes: notes.map(n => ({ pitch: n.pitch, start: n.startTime, duration: n.duration })),
     });
 
-    setIsRecording(false);
-    setIsPlaying(false);
-    setIsCountingIn(false);
-    setCountIn(0);
-
-    Tone.getTransport().stop();
-    Tone.getTransport().position = 0;
+    // NOTE: Transport control is handled by FLToolbar, not here
+    // We only handle the recording session cleanup
 
     // Commit the recording session (finalize - keep recorded notes)
     commitRecordingSession();
-    console.log('✅ Recording session committed - notes saved');
+    console.log('✅ [RecordingEngine] Recording session committed - notes saved');
 
     // Callback with recorded notes
     if (onRecordingComplete) {
@@ -194,13 +124,10 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
 
   // Cancel recording and revert to pre-recording state
   const cancelRecording = () => {
-    setIsRecording(false);
-    setIsPlaying(false);
-    setIsCountingIn(false);
-    setCountIn(0);
+    console.log('🚫 [RecordingEngine] Cancelling recording...');
 
-    Tone.getTransport().stop();
-    Tone.getTransport().position = 0;
+    // NOTE: Transport control is handled by FLToolbar, not here
+    // We only handle the recording session cleanup
 
     // Cancel the recording session (revert to pre-recording state)
     cancelRecordingSession();
@@ -208,15 +135,29 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     recordedNotesRef.current = [];
     activeNotesRef.current.clear();
 
-    console.log('🚫 Recording cancelled - reverted to previous state');
+    console.log('🚫 [RecordingEngine] Recording cancelled - reverted to previous state');
   };
 
   // Handle keyboard/MIDI input during recording
   const handleNoteOn = useCallback((pitch: number, velocity: number = 0.8) => {
-    // Use refs for accurate state checking
-    if (!isRecordingRef.current || isCountingInRef.current) {
-      console.log('❌ Note blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
+    // Read directly from Zustand store (synchronous) instead of refs that lag behind
+    // React renders. The FLToolbar scheduler sets isCountingIn=false in the store
+    // immediately when count-in completes, but the ref sync goes through
+    // useEffect → React re-render → ref update, adding 1-2 frames of delay.
+    // During that delay window, notes on the downbeat would be blocked.
+    const storeState = useBeatStore.getState();
+    if (!storeState.isRecording || storeState.isCountingIn) {
+      console.log('❌ Note blocked:', { isRecording: storeState.isRecording, isCountingIn: storeState.isCountingIn });
       return;
+    }
+
+    // Auto-start recording session if count-in just ended but useEffect hasn't fired yet
+    if (!recordingSessionStartedRef.current) {
+      console.log('🎬 [RecordingEngine] Auto-starting recording session (downbeat note arrived before useEffect)');
+      recordingSessionStartedRef.current = true;
+      startRecordingSession();
+      recordingStartTimeRef.current = storeState.recordingDownbeatTime;
+      recordedNotesRef.current = [];
     }
 
     console.log('✅ Recording note ON:', pitch);
@@ -229,12 +170,13 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
       startTime: relativeTime,
       pitch,
     });
-  }, []); // Empty deps - uses refs only
+  }, [startRecordingSession]); // startRecordingSession is stable (Zustand action)
 
   const handleNoteOff = useCallback((pitch: number) => {
-    // Use refs for accurate state checking
-    if (!isRecordingRef.current || isCountingInRef.current) {
-      console.log('❌ Note OFF blocked:', { isRecording: isRecordingRef.current, isCountingIn: isCountingInRef.current });
+    // Read directly from Zustand store (synchronous) — same reason as handleNoteOn
+    const storeState = useBeatStore.getState();
+    if (!storeState.isRecording || storeState.isCountingIn) {
+      console.log('❌ Note OFF blocked:', { isRecording: storeState.isRecording, isCountingIn: storeState.isCountingIn });
       return;
     }
 
@@ -308,13 +250,14 @@ export const RecordingEngine: React.FC<RecordingEngineProps> = ({ onRecordingCom
     };
   }, [handleNoteOn, handleNoteOff]); // Include callback dependencies
 
-  // Render count-in indicator
+  // Render count-in indicator using store's countInStep
   if (isCountingIn) {
+    const displayCount = (countInStep % beatsPerMeasure) + 1; // Show 1-N for current beat
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 pointer-events-none">
         <div className="text-center">
           <div className="text-9xl font-bold text-white mb-4 animate-pulse">
-            {countIn}
+            {displayCount}
           </div>
           <div className="text-2xl text-gray-300">
             Get ready to record...
@@ -356,4 +299,3 @@ function quantizeNotes(notes: MidiNote[], bpm: number): MidiNote[] {
 }
 
 export default RecordingEngine;
-

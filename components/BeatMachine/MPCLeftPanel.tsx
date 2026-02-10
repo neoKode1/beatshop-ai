@@ -47,6 +47,8 @@ const MPCLeftPanel: React.FC = () => {
     deleteSelectedNotes,
     currentMode,
     setCurrentMode,
+    padMode,
+    setPadMode,
   } = useBeatStore();
 
   // Note divisions for touch strip (like real MPC)
@@ -92,6 +94,13 @@ const MPCLeftPanel: React.FC = () => {
 
         {/* Function Buttons */}
         <div className="flex flex-col gap-0.5 mt-0.5 flex-1">
+          <MPCSmallButton
+            label={padMode === 'chromatic' ? 'CHROM' : 'DRUM'}
+            active={padMode === 'chromatic'}
+            color={padMode === 'chromatic' ? 'cyan' : 'gray'}
+            size="xs"
+            onClick={() => setPadMode(padMode === 'chromatic' ? 'drum' : 'chromatic')}
+          />
           <MPCSmallButton label="FULL LEVEL" active={fullLevelEnabled} color="red" size="xs" onClick={toggleFullLevel} />
           <MPCSmallButton label="HALF LEVEL" active={halfLevelEnabled} color={halfLevelEnabled ? 'orange' : 'gray'} size="xs" onClick={toggleHalfLevel} />
           <MPCSmallButton label="COPY" color="gray" size="xs" onClick={copyPattern} />

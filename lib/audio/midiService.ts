@@ -62,7 +62,7 @@ class MidiService {
       // Listen for connection changes
       this.midiAccess.onstatechange = (e) => {
         const port = e.port;
-        if (port.type === 'input') {
+        if (port && port.type === 'input') {
           if (port.state === 'connected') {
             this.connectInput(port as MIDIInput);
           } else {

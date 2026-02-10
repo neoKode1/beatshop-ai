@@ -45,9 +45,9 @@ const PatternList: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg transition-all border border-gray-600/30"
       >
-        <Music size={18} className="text-purple-400" />
+        <Music size={18} className="text-amber-400" />
         <span className="font-bold text-gray-200">Patterns</span>
-        <span className="text-xs bg-purple-600/30 px-2 py-0.5 rounded-full text-purple-300">
+        <span className="text-xs bg-amber-600/30 px-2 py-0.5 rounded-full text-amber-300">
           {patterns.length}
         </span>
       </button>
@@ -66,7 +66,7 @@ const PatternList: React.FC = () => {
               <h3 className="font-bold text-gray-200">Saved Patterns</h3>
               <button
                 onClick={() => setShowSaveDialog(true)}
-                className="flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-bold text-white transition-all"
+                className="flex items-center gap-1 px-3 py-1 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-bold text-white transition-all"
               >
                 <Plus size={14} />
                 Save Current
@@ -90,7 +90,7 @@ const PatternList: React.FC = () => {
                       onDragStart={(e) => startDrag(e, pattern)}
                       className={`p-3 rounded-lg border transition-all cursor-move ${
                         currentPatternId === pattern.id
-                          ? 'bg-purple-600/20 border-purple-500/50'
+                          ? 'bg-amber-600/20 border-amber-500/50'
                           : 'bg-gray-800/30 border-gray-700/30 hover:bg-gray-700/30'
                       }`}
                     >
@@ -104,7 +104,7 @@ const PatternList: React.FC = () => {
                               if (e.key === 'Enter') handleRename(pattern.id);
                               if (e.key === 'Escape') setEditingId(null);
                             }}
-                            className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 rounded text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 rounded text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
                             autoFocus
                           />
                           <button
@@ -201,7 +201,7 @@ const PatternList: React.FC = () => {
                     if (e.key === 'Escape') setShowSaveDialog(false);
                   }}
                   placeholder="My Awesome Beat"
-                  className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 font-semibold focus:border-purple-500 focus:outline-none"
+                  className="w-full px-4 py-2 bg-gray-800 border-2 border-gray-700/50 rounded-lg text-gray-200 font-semibold focus:border-amber-500 focus:outline-none"
                   autoFocus
                 />
               </div>
@@ -245,7 +245,7 @@ const PatternList: React.FC = () => {
               <button
                 onClick={handleSavePattern}
                 disabled={!newPatternName.trim()}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-bold text-white transition-all"
+                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-bold text-white transition-all"
               >
                 Save
               </button>

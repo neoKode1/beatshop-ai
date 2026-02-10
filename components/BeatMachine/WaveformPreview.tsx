@@ -41,10 +41,44 @@ const WaveformPreview: React.FC<WaveformPreviewProps> = ({
     const loadWaveform = async () => {
       try {
         setIsLoading(true);
+
+        // Validate URL before fetching
+        if (!sampleUrl || typeof sampleUrl !== 'string' || sampleUrl.trim() === '') {
+          setWaveformData(null);
+          return;
+        }
+
         const audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        
-        const response = await fetch(sampleUrl);
+
+        let response: Response;
+        try {
+          response = await fetch(sampleUrl);
+        } catch (fetchError) {
+          // Network error, blob revoked, or invalid URL
+          console.warn(`Waveform fetch error for ${sampleUrl}:`, fetchError);
+          setWaveformData(null);
+          audioContext.close();
+          return;
+        }
+
+        // Check if fetch was successful
+        if (!response.ok) {
+          console.warn(`Waveform fetch failed: ${response.status} for ${sampleUrl}`);
+          setWaveformData(null);
+          audioContext.close();
+          return;
+        }
+
         const arrayBuffer = await response.arrayBuffer();
+
+        // Check if we got valid data
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          console.warn(`Empty audio data for ${sampleUrl}`);
+          setWaveformData(null);
+          audioContext.close();
+          return;
+        }
+
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         
         // Get channel data (mono or left channel)

@@ -74,10 +74,8 @@ export class MasterEffects {
     });
 
     // 6. Bitcrusher
-    this.bitcrusher = new Tone.BitCrusher({
-      bits: 16, // Start at full quality (1-16)
-      wet: 0,
-    });
+    this.bitcrusher = new Tone.BitCrusher(16); // Start at full quality (1-16)
+    this.bitcrusher.wet.value = 0;
 
     // 7. Reverb
     this.reverb = new Tone.Reverb({
@@ -114,11 +112,8 @@ export class MasterEffects {
       pan: 0,
     });
 
-    // 13. Meter (for stereo volume visualization)
-    this.meter = new Tone.Meter({
-      smoothing: 0.8,
-      channels: 2,  // Stereo metering
-    });
+    // 13. Meter (for volume visualization)
+    this.meter = new Tone.Meter(0.8);
 
     // Connect the chain: EQ -> Distortion -> Chorus -> Phaser -> Flanger -> Bitcrusher -> Reverb -> Delay -> Compressor -> Stereo -> Limiter -> Channel -> Meter -> Destination
     this.eq3.connect(this.distortion);
@@ -181,14 +176,30 @@ export class MasterEffects {
 
   // ===== VOLUME CONTROL =====
   public setMasterVolume(volume: number) {
+    // Ensure effects chain is initialized
+    if (!this.initialized) {
+      this.initialize();
+    }
     if (this.channel) {
-      this.channel.volume.value = Tone.gainToDb(volume);
-      console.log(`🔊 Master Volume: ${(volume * 100).toFixed(0)}%`);
+      // Handle both gain (0-1) and dB values
+      // If volume is <= 0 and looks like dB (negative or zero), use directly
+      // Otherwise, convert gain to dB
+      const dbValue = volume <= 0 ? volume : Tone.gainToDb(Math.max(0.001, volume));
+      this.channel.volume.value = dbValue;
+      console.log(`🔊 Master Volume: ${dbValue.toFixed(1)} dB`);
+    }
+  }
+
+  // Helper to ensure initialization before any operation
+  private ensureInit() {
+    if (!this.initialized) {
+      this.initialize();
     }
   }
 
   // ===== COMPRESSOR CONTROLS =====
   public setCompressorThreshold(threshold: number) {
+    this.ensureInit();
     if (this.compressor) {
       this.compressor.threshold.value = threshold;
       console.log(`🎚️ Compressor Threshold: ${threshold.toFixed(1)} dB`);
@@ -196,6 +207,7 @@ export class MasterEffects {
   }
 
   public setCompressorRatio(ratio: number) {
+    this.ensureInit();
     if (this.compressor) {
       this.compressor.ratio.value = ratio;
       console.log(`🎚️ Compressor Ratio: ${ratio.toFixed(1)}:1`);
@@ -203,6 +215,7 @@ export class MasterEffects {
   }
 
   public setCompressorAttack(attack: number) {
+    this.ensureInit();
     if (this.compressor) {
       this.compressor.attack.value = attack;
       console.log(`🎚️ Compressor Attack: ${(attack * 1000).toFixed(1)} ms`);
@@ -210,6 +223,7 @@ export class MasterEffects {
   }
 
   public setCompressorRelease(release: number) {
+    this.ensureInit();
     if (this.compressor) {
       this.compressor.release.value = release;
       console.log(`🎚️ Compressor Release: ${(release * 1000).toFixed(1)} ms`);
@@ -218,6 +232,7 @@ export class MasterEffects {
 
   // ===== EQ CONTROLS =====
   public setEqLow(gain: number) {
+    this.ensureInit();
     if (this.eq3) {
       this.eq3.low.value = gain;
       console.log(`🎛️ EQ Low: ${gain > 0 ? '+' : ''}${gain.toFixed(1)} dB`);
@@ -225,6 +240,7 @@ export class MasterEffects {
   }
 
   public setEqMid(gain: number) {
+    this.ensureInit();
     if (this.eq3) {
       this.eq3.mid.value = gain;
       console.log(`🎛️ EQ Mid: ${gain > 0 ? '+' : ''}${gain.toFixed(1)} dB`);
@@ -232,6 +248,7 @@ export class MasterEffects {
   }
 
   public setEqHigh(gain: number) {
+    this.ensureInit();
     if (this.eq3) {
       this.eq3.high.value = gain;
       console.log(`🎛️ EQ High: ${gain > 0 ? '+' : ''}${gain.toFixed(1)} dB`);
@@ -240,6 +257,7 @@ export class MasterEffects {
 
   // ===== DISTORTION CONTROL =====
   public setDistortion(amount: number) {
+    this.ensureInit();
     if (this.distortion) {
       // Map 0-1 to distortion amount (0-1) and wet/dry mix
       this.distortion.distortion = amount;
@@ -250,6 +268,7 @@ export class MasterEffects {
 
   // ===== REVERB CONTROLS =====
   public setReverbWet(wet: number) {
+    this.ensureInit();
     if (this.reverb) {
       this.reverb.wet.value = wet;
       console.log(`🌊 Reverb: ${(wet * 100).toFixed(0)}%`);
@@ -257,6 +276,7 @@ export class MasterEffects {
   }
 
   public setReverbDecay(decay: number) {
+    this.ensureInit();
     if (this.reverb) {
       this.reverb.decay = decay;
     }
@@ -264,6 +284,7 @@ export class MasterEffects {
 
   // ===== DELAY CONTROLS =====
   public setDelayWet(wet: number) {
+    this.ensureInit();
     if (this.delay) {
       this.delay.wet.value = wet;
       console.log(`⏱️ Delay: ${(wet * 100).toFixed(0)}%`);
@@ -271,12 +292,14 @@ export class MasterEffects {
   }
 
   public setDelayTime(time: string) {
+    this.ensureInit();
     if (this.delay) {
       this.delay.delayTime.value = time;
     }
   }
 
   public setDelayFeedback(feedback: number) {
+    this.ensureInit();
     if (this.delay) {
       this.delay.feedback.value = feedback;
     }
@@ -284,6 +307,7 @@ export class MasterEffects {
 
   // ===== STEREO WIDTH CONTROL =====
   public setStereoWidth(width: number) {
+    this.ensureInit();
     if (this.stereoWidener) {
       // Map 0-1 to 0-1 (0 = mono, 0.5 = normal, 1 = wide)
       this.stereoWidener.width.value = width;
@@ -293,14 +317,16 @@ export class MasterEffects {
 
   // ===== LIMITER CONTROL =====
   public setLimiterThreshold(threshold: number) {
+    this.ensureInit();
     if (this.limiter) {
-      this.limiter.threshold = threshold;
+      this.limiter.threshold.value = threshold;
       console.log(`🧱 Limiter Threshold: ${threshold.toFixed(1)} dB`);
     }
   }
 
   // ===== CHORUS CONTROL =====
   public setChorus(amount: number) {
+    this.ensureInit();
     if (this.chorus) {
       this.chorus.wet.value = amount;
       console.log(`🌀 Chorus: ${(amount * 100).toFixed(0)}%`);
@@ -309,6 +335,7 @@ export class MasterEffects {
 
   // ===== PHASER CONTROL =====
   public setPhaser(amount: number) {
+    this.ensureInit();
     if (this.phaser) {
       this.phaser.wet.value = amount;
       console.log(`🔄 Phaser: ${(amount * 100).toFixed(0)}%`);
@@ -317,6 +344,7 @@ export class MasterEffects {
 
   // ===== FLANGER CONTROL =====
   public setFlanger(amount: number) {
+    this.ensureInit();
     if (this.flanger) {
       this.flanger.wet.value = amount;
       // Modulate delay time slightly for flanger effect
@@ -327,6 +355,7 @@ export class MasterEffects {
 
   // ===== BITCRUSHER CONTROL =====
   public setBitcrusher(amount: number) {
+    this.ensureInit();
     if (this.bitcrusher) {
       // Map 0-1 to bits 16-1 (0 = no crush, 1 = max crush)
       const bits = Math.max(1, Math.round(16 - (amount * 15)));

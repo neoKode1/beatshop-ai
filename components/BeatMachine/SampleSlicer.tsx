@@ -4,8 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useBeatStore } from '@/store/useBeatStore';
 import { useToast } from '@/components/Toast/Toast';
 import {
-  Scissors, Grid3X3, Wand2, Play, Square, ChevronDown,
-  Zap, RotateCcw, Check, X, Sliders
+  Scissors, Grid3X3, Wand2, Play, Square,
+  Zap, X
 } from 'lucide-react';
 import {
   detectTransients,
@@ -15,7 +15,6 @@ import {
   applySliceFades,
   SlicePoint,
   SliceRegion,
-  SlicerSettings,
 } from '@/lib/audio/sampleSlicer';
 import {
   decodeAudioUrl,
@@ -44,7 +43,7 @@ const SampleSlicer: React.FC<SampleSlicerProps> = ({ onClose }) => {
   const [mode, setMode] = useState<'transient' | 'grid'>('transient');
   const [sensitivity, setSensitivity] = useState(50);
   const [gridDivision, setGridDivision] = useState(16);
-  const [minSliceLength, setMinSliceLength] = useState(50);
+  const [minSliceLength] = useState(50);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -167,7 +166,7 @@ const SampleSlicer: React.FC<SampleSlicerProps> = ({ onClose }) => {
     const ctx = audioContextRef.current;
     
     const buffer = ctx.createBuffer(fadedData.length, fadedData[0].length, audioBuffer.sampleRate);
-    fadedData.forEach((ch, i) => buffer.copyToChannel(ch, i));
+    fadedData.forEach((ch, i) => buffer.copyToChannel(new Float32Array(ch), i));
     
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -195,10 +194,11 @@ const SampleSlicer: React.FC<SampleSlicerProps> = ({ onClose }) => {
         const url = await audioBufferToUrl(buffer);
 
         assignSampleToPad(i, {
+          id: `slice-${Date.now()}-${i}`,
           name: `${sampleName} [${i + 1}]`,
           url,
           type: 'audio',
-          category: 'sliced',
+          category: 'perc', // Sliced samples default to percussion category
         });
       }
 

@@ -16,6 +16,23 @@ const config: Config = {
           850: '#1a202c',
           950: '#0a0e1a',
         },
+        fl: {
+          panel: {
+            DEFAULT: '#1a1a1a',
+            dark: '#111111',
+            medium: '#252525',
+            light: '#2e2e2e',
+          },
+          accent: {
+            orange: '#ff6b00',
+            amber: '#f5a623',
+          },
+          lcd: {
+            bg: '#0a0f0a',
+            border: '#1a2a1a',
+            text: '#00ff00',
+          },
+        },
       },
     },
   },

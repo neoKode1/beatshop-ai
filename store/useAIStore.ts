@@ -129,6 +129,8 @@ export const useAIStore = create<AIStore>()(
             ...DEFAULT_GENERATION_PARAMS,
             ...currentParams,
             prompt: currentParams.prompt!,
+            instrumental: currentParams.instrumental ?? DEFAULT_GENERATION_PARAMS.instrumental ?? false,
+            duration: currentParams.duration ?? DEFAULT_GENERATION_PARAMS.duration ?? 30,
             referenceAudioUrl: referenceAudioUrl || undefined,
           };
 
